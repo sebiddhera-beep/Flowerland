@@ -74,6 +74,38 @@ h1,h2,h3 {{ color:{GREEN}; }}
 .nursery {{ background:#fff; border:1px solid #cfe3cf; border-radius:10px;
            padding:8px 12px; margin-top:6px; font-size:14px; }}
 .stampbn {{ background:#e9f6e9; border-radius:12px; padding:10px 14px; font-weight:700; }}
+
+/* ── 모바일 대응 (갤럭시 S24: 뷰포트 약 384px) ─────────────────────
+   Streamlit은 좁은 화면에서 컬럼을 세로로 쌓아버리므로,
+   배너 2열·아이콘 4열·TOP5 5열이 목업처럼 가로로 유지되게 강제한다. */
+[data-testid="stHorizontalBlock"] {{
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    overflow-x: auto;              /* TOP5 등은 좌우 스와이프 */
+    -webkit-overflow-scrolling: touch;
+}}
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+    min-width: 0 !important;
+    flex: 1 1 0 !important;
+}}
+@media (max-width: 640px) {{
+    .block-container {{ padding-left: .7rem; padding-right: .7rem; padding-top: .6rem; }}
+    .big  {{ font-size: 20px; }}
+    .step {{ font-size: 13px; }}
+    .banner {{ min-height: 150px; padding: 12px; }}
+    .icon-card .e {{ font-size: 24px; }}
+    .icon-card .t {{ font-size: 11px; }}
+    .icon-card .s {{ font-size: 9.5px; }}
+    .top5 {{ min-width: 108px; }}      /* 카드 최소폭 확보 → 넘치면 스와이프 */
+    .top5 b {{ font-size: 12px; }}
+    .acard {{ min-height: 96px; padding: 9px; }}
+    .acard .t {{ font-size: 13px; }}
+    .acard .s {{ font-size: 11px; }}
+    .nursery {{ font-size: 12.5px; }}
+    .stButton button {{ padding: .45rem .5rem; font-size: 14px; }}
+    h3 {{ font-size: 1.05rem !important; }}
+    h4 {{ font-size: .95rem !important; }}
+}}
 </style>""", unsafe_allow_html=True)
 
 USER_NAME = "정종섭"
