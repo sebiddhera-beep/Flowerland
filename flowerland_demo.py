@@ -82,6 +82,11 @@ USER_NAME = "정종섭"
 with st.sidebar:
     st.markdown("### ⚙️ AI 엔진 설정")
     _default_key = gm.get_env_key() if HAS_GEMINI else ""
+    if not _default_key:  # Streamlit Cloud 배포 시 Secrets에서 자동 로드
+        try:
+            _default_key = st.secrets.get("GEMINI_API_KEY", "")
+        except Exception:
+            pass
     api_key = st.text_input("Gemini API 키", value=_default_key, type="password",
                             help="aistudio.google.com 에서 무료 발급 → 붙여넣기")
     if api_key:
