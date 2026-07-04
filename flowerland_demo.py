@@ -227,8 +227,6 @@ def best_card(b, pid):
               key=f"go_{b['id']}_{pid}")
     c2.button("📅 방문 예약하기", use_container_width=True, key=f"rsv_{b['id']}_{pid}")
     c3.button("⭐ 내 리스트 저장", use_container_width=True, key=f"sv_{b['id']}_{pid}")
-    st.markdown("<div class='stampbn'>🎟️ 불로단지 스탬프 투어 참여 (방문 시 QR 스캔) ▶</div>",
-                unsafe_allow_html=True)
 
 def img_hash(b: bytes) -> int:
     return int(hashlib.md5(b).hexdigest(), 16)
@@ -390,8 +388,11 @@ ss.setdefault("face_step", 1); ss.setdefault("space_step", 1)
 def go(p): ss.page = p; st.rerun()
 def header():
     c1, c2 = st.columns([3, 1])
-    c1.markdown("### 🌱 Flower Land <span style='font-size:13px;color:#777'>(플라워랜드)</span>",
-                unsafe_allow_html=True)
+    if asset("FL_Land.png"):
+        c1.image(asset("FL_Land.png"), width=260)
+    else:
+        c1.markdown("### 🌱 Flower Land <span style='font-size:13px;color:#777'>(플라워랜드)</span>",
+                    unsafe_allow_html=True)
     c2.markdown(f"<div style='text-align:right;padding-top:14px'>{USER_NAME}님 🌿</div>",
                 unsafe_allow_html=True)
 
@@ -400,7 +401,6 @@ page = ss.page
 # ══════════════ 홈 ══════════════
 if page == "home":
     header()
-    st.markdown("#### 2-Track AI 배너")
     b1, b2 = st.columns(2)
     with b1:
         if asset("MBTI.png"):
@@ -433,12 +433,12 @@ if page == "home":
         if q.strip():
             ss.search_q = q.strip(); go("search")
     cols = st.columns(4)
-    ICON_FILES = ["MAP.png", "Port.png", "QR.png", "TREE.png"]
+    ICON_FILES = ["MAP.png", "Port.png", "TREE.png", "CARE.png"]
     ICON_ASPECT = ["165/222", "172/222", "172/222", "172/222"]
-    for col, e, ic, asp, t, s, tgt in zip(cols, "🗺️🪴📱🔍", ICON_FILES, ICON_ASPECT,
-            ["농원 지도", "분갈이·화분 특화", "QR 스탬프 투어", "식물 건강 진단"],
-            ["80개 농원 안내", "특화 농원 보기", "단지 방문 인증", "시든 식물 처방"],
-            ["map", "repot", "stamp", "diag"]):
+    for col, e, ic, asp, t, s, tgt in zip(cols, "🗺️🪴🔍💧", ICON_FILES, ICON_ASPECT,
+            ["농원 지도", "분갈이·화분 특화", "식물 건강 진단", "내 식물 관리"],
+            ["80개 농원 안내", "특화 농원 보기", "시든 식물 처방", "물·영양 알림"],
+            ["map", "repot", "diag", "care"]):
         with col:
             if asset(ic):
                 if clickable_image(asset(ic), f"imgbtn_{tgt}", asp):
@@ -815,21 +815,68 @@ elif page == "repot":
                     f"분갈이 서비스 5,000원~ · 수제 토분 취급 · 📞 예약 문의</div>",
                     unsafe_allow_html=True)
 
-# ══════════════ QR 스탬프 ══════════════
-elif page == "stamp":
+# ══════════════ 내 식물 관리 (물·영양) ══════════════
+elif page == "care":
     header()
     if st.button("← 홈으로"): go("home")
-    st.markdown("## 📱 QR 스탬프 투어")
-    ss.setdefault("stamps", 3)
-    n = ss.stamps
-    st.progress(min(n / 20, 1.0), text=f"현재 스탬프 {n}개 / 20개")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("5곳", "화분 할인쿠폰", "✅" if n >= 5 else f"{5-n}곳 남음")
-    c2.metric("10곳", "미니 다육 증정", "✅" if n >= 10 else f"{10-n}곳 남음")
-    c3.metric("20곳", "시즌 굿즈", "✅" if n >= 20 else f"{20-n}곳 남음")
-    if st.button("📷 QR 스캔 (시연: 랜덤 농원 인증)", type="primary", use_container_width=True):
-        row = conn.execute("SELECT name FROM nursery ORDER BY RANDOM() LIMIT 1").fetchone()
-        ss.stamps += 1
-        st.success(f"✅ {row[0]} 방문 인증 완료! (GPS 반경 150m 검증 통과)")
-        st.rerun()
-    st.caption("K-2 첫 출격지 등 역사 포인트 3곳은 보너스 스탬프 2개 적립")
+    st.markdown("## 💧 내 식물 관리")
+    st.caption("우리 집 식물의 물 주기·영양제 일정을 관리하세요.")
+
+    from datetime import date, timedelta
+    # 데모용 초기 식물 2개 (세션 유지)
+    if "myplants" not in ss:
+        ss.myplants = [
+            {"name": "거실 몬스테라", "pid": "P001", "water_cycle": 7,  "feed_cycle": 30,
+             "last_water": date.today() - timedelta(days=6),
+             "last_feed":  date.today() - timedelta(days=25)},
+            {"name": "베란다 다육이", "pid": "P016", "water_cycle": 14, "feed_cycle": 45,
+             "last_water": date.today() - timedelta(days=3),
+             "last_feed":  date.today() - timedelta(days=10)},
+        ]
+
+    # ── 새 식물 등록 ──
+    with st.expander("➕ 새 식물 등록"):
+        nm = st.text_input("별명 (예: 안방 스투키)", key="care_nm")
+        sp = st.selectbox("품종", list(PLANT_NAMES.values()), key="care_sp")
+        wc = st.slider("물 주기 (일)", 3, 30, 7, key="care_wc")
+        fc = st.slider("영양제 주기 (일)", 14, 90, 30, key="care_fc")
+        if st.button("등록", type="primary", key="care_add") and nm:
+            ss.myplants.append({"name": nm, "pid": pid_of(sp, "P001"),
+                                "water_cycle": wc, "feed_cycle": fc,
+                                "last_water": date.today(), "last_feed": date.today()})
+            st.success(f"'{nm}' 등록 완료!")
+            st.rerun()
+
+    st.write("")
+    today = date.today()
+    for i, pl in enumerate(ss.myplants):
+        d_w = (today - pl["last_water"]).days
+        d_f = (today - pl["last_feed"]).days
+        left_w = pl["water_cycle"] - d_w
+        left_f = pl["feed_cycle"] - d_f
+        w_stat = ("🔴 오늘 물 주세요!" if left_w <= 0 else
+                  f"💧 물까지 {left_w}일 남음")
+        f_stat = ("🟠 영양제 줄 때!" if left_f <= 0 else
+                  f"🧪 영양까지 {left_f}일 남음")
+        st.markdown(f"""<div class='acard'>
+            <span class='t'>🪴 {pl['name']}</span>
+            <span style='color:#888;font-size:12px'> · {PLANT_NAMES.get(pl['pid'],'')}</span><br>
+            <span class='s'>{w_stat} (주기 {pl['water_cycle']}일) &nbsp;|&nbsp; {f_stat} (주기 {pl['feed_cycle']}일)</span>
+            </div>""", unsafe_allow_html=True)
+        st.progress(min(max(d_w / pl["water_cycle"], 0.0), 1.0),
+                    text=f"마지막 물: {pl['last_water']} ({d_w}일 전)")
+        c1, c2, c3 = st.columns(3)
+        if c1.button("💧 물 줬어요", key=f"w_{i}", use_container_width=True):
+            pl["last_water"] = today; st.rerun()
+        if c2.button("🧪 영양제 줬어요", key=f"f_{i}", use_container_width=True):
+            pl["last_feed"] = today; st.rerun()
+        if c3.button("🗑 삭제", key=f"d_{i}", use_container_width=True):
+            ss.myplants.pop(i); st.rerun()
+        st.write("")
+
+    # 물/영양 관련 자재 → 단지 농원 연결 (트래픽 분배)
+    st.markdown("#### 🏪 영양제·급수 용품이 필요하면")
+    b = best_nursery("P016", "care") if 'best_nursery' in dir() else None
+    pairs = pick_nurseries("P016", 2, "care")
+    show_nurseries(pairs, "P016")
+
