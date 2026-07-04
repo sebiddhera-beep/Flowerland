@@ -594,9 +594,7 @@ if page == "home":
     for rank, (pid, em, col) in enumerate(zip(
             ["P001", "P002", "P003", "P009", "P006"], "🌿🍃🌱🪴🌳", cols), 1):
         with col:
-            b = best_nursery(pid, "fun07")
-            nm = b['name'] if b else '-'
-            label = f"{em}\n{rank}. {PLANT_NAMES[pid]}\n{nm} · 💬{random.randint(8,15)}"
+            label = f"{em}\n{rank}. {PLANT_NAMES[pid]}"
             if st.button(label, key=f"top_{pid}", use_container_width=True):
                 ss.plant_pid = pid
                 go("plant")
