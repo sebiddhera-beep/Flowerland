@@ -75,6 +75,23 @@ h1,h2,h3 {{ color:{GREEN}; }}
            padding:8px 12px; margin-top:6px; font-size:14px; }}
 .stampbn {{ background:#e9f6e9; border-radius:12px; padding:10px 14px; font-weight:700; }}
 
+/* ── '홈으로' 버튼 전용: 파란색 강조 + 크게 (key='home_*'만 타겟) ── */
+[class*="st-key-home_"] button {{
+    background: #1565C0 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    padding: 0.7rem 1.4rem !important;
+    box-shadow: 0 3px 10px rgba(21,101,192,.35) !important;
+}}
+[class*="st-key-home_"] button:hover {{
+    background: #0D47A1 !important;
+    transform: translateY(-1px);
+    transition: all .15s;
+}}
+
 /* ── 모바일 대응 (갤럭시 S24: 뷰포트 약 384px) ─────────────────────
    Streamlit은 좁은 화면에서 컬럼을 세로로 쌓아버리므로,
    배너 2열·아이콘 4열·TOP5 5열이 목업처럼 가로로 유지되게 강제한다. */
@@ -191,7 +208,28 @@ def get_conn():
     td.init_schema(conn)
     if fresh or conn.execute("SELECT COUNT(*) FROM nursery").fetchone()[0] == 0:
         td.seed(conn, random.Random(42))
+    _ensure_admin_columns(conn)
     return conn
+
+def _ensure_admin_columns(conn):
+    """관리자 모드용 컬럼을 없으면 추가(마이그레이션). 기존 데이터 보존."""
+    ncols = [r[1] for r in conn.execute("PRAGMA table_info(nursery)").fetchall()]
+    if "pin" not in ncols:
+        conn.execute("ALTER TABLE nursery ADD COLUMN pin TEXT")
+        # 농원별 4자리 PIN 자동 발급(번호 기반, 시연용). 실서비스는 개별 재설정.
+        for (nid,) in conn.execute("SELECT id FROM nursery").fetchall():
+            pin = f"{(int(nid[1:]) * 7 + 1000) % 9000 + 1000:04d}"
+            conn.execute("UPDATE nursery SET pin=? WHERE id=?", (pin, nid))
+    if "tagline" not in ncols:
+        conn.execute("ALTER TABLE nursery ADD COLUMN tagline TEXT DEFAULT ''")
+    if "specialty" not in ncols:
+        conn.execute("ALTER TABLE nursery ADD COLUMN specialty TEXT DEFAULT ''")
+    scols = [r[1] for r in conn.execute("PRAGMA table_info(stock)").fetchall()]
+    if "price_min" not in scols:
+        conn.execute("ALTER TABLE stock ADD COLUMN price_min INTEGER DEFAULT 0")
+    if "price_max" not in scols:
+        conn.execute("ALTER TABLE stock ADD COLUMN price_max INTEGER DEFAULT 0")
+    conn.commit()
 
 conn = get_conn()
 
@@ -542,11 +580,16 @@ if page == "home":
                         f"<br>💬 {random.randint(8, 15)}개</span></div>",
                         unsafe_allow_html=True)
     st.caption("※ 초기 시연 — AI 분석은 규칙 기반 목업, 농원 선정은 실제 가중 랜덤 알고리즘 동작")
+    st.write("")
+    with st.expander("🔑 회원사 · 상인회 로그인"):
+        st.caption("농원주는 자기 농원의 추천 식물을 직접 등록·편집할 수 있습니다.")
+        if st.button("회원사 관리자 모드 들어가기", use_container_width=True):
+            go("admin")
 
 # ══════════════ 얼굴 & MBTI (3단계) ══════════════
 elif page == "face":
     header()
-    if st.button("← 홈으로"): go("home")
+    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
     step = ss.face_step
 
     if step == 1:
@@ -630,7 +673,7 @@ elif page == "face":
 # ══════════════ 공간 플랜테리어 (4단계) ══════════════
 elif page == "space":
     header()
-    if st.button("← 홈으로"): go("home")
+    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
     step = ss.space_step
     st.progress(step / 4, text=f"{step}단계 / 4단계")
 
@@ -783,7 +826,7 @@ elif page == "space":
 # ══════════════ 식물 검색 (취급 회원사 찾기) ══════════════
 elif page == "search":
     header()
-    if st.button("← 홈으로"): go("home")
+    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
     st.markdown("## 🔎 식물 검색")
     st.caption("① AI가 식물 유형·특징을 소개하고 ② DB에서 취급 농원(재고)을 안내합니다.")
     q = st.text_input("식물 이름", value=ss.get("search_q", ""),
@@ -823,10 +866,182 @@ elif page == "search":
             else:
                 st.info("단지 내 취급 농원 정보가 없습니다. 농원에 직접 문의해 보세요.")
 
+# ══════════════ 회원사 관리자 모드 ══════════════
+elif page == "admin":
+    header()
+    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    st.markdown("## 🔑 회원사 관리자 모드")
+
+    # ── 로그인 상태 관리 ──
+    if "admin_nid" not in ss: ss.admin_nid = None
+    if "is_master" not in ss: ss.is_master = False
+
+    MASTER_PIN = "0000"   # 상인회 마스터 (시연용)
+
+    # ── 로그아웃 ──
+    if ss.admin_nid or ss.is_master:
+        who = "상인회 관리자" if ss.is_master else \
+              conn.execute("SELECT name FROM nursery WHERE id=?", (ss.admin_nid,)).fetchone()[0]
+        c1, c2 = st.columns([3,1])
+        c1.success(f"로그인: {who}")
+        if c2.button("로그아웃"):
+            ss.admin_nid = None; ss.is_master = False; st.rerun()
+
+    # ── 로그인 폼 ──
+    if not ss.admin_nid and not ss.is_master:
+        st.info("농원을 선택하고 PIN 4자리를 입력하세요. (상인회 관리자는 농원='상인회 관리자' 선택)")
+        nlist = conn.execute("SELECT id, name FROM nursery ORDER BY id").fetchall()
+        opts = ["(상인회 관리자)"] + [f"{n} ({i})" for i, n in nlist]
+        sel = st.selectbox("농원 선택", opts)
+        pin = st.text_input("PIN 4자리", max_chars=4, type="password")
+        cc1, cc2 = st.columns([1,3])
+        if cc1.button("로그인", type="primary"):
+            if sel == "(상인회 관리자)":
+                if pin == MASTER_PIN:
+                    ss.is_master = True; st.rerun()
+                else:
+                    st.error("마스터 PIN이 올바르지 않습니다.")
+            else:
+                nid = sel.split("(")[-1].rstrip(")")
+                real = conn.execute("SELECT pin FROM nursery WHERE id=?", (nid,)).fetchone()
+                if real and pin == real[0]:
+                    ss.admin_nid = nid; st.rerun()
+                else:
+                    st.error("PIN이 올바르지 않습니다.")
+        with cc2:
+            with st.expander("PIN을 모르나요? (시연용 안내)"):
+                st.caption("시연 편의를 위해 각 농원 PIN은 아래에서 확인 가능합니다. "
+                           "실서비스에서는 상인회가 개별 발급합니다.")
+                if st.checkbox("전체 PIN 표시"):
+                    rows = conn.execute("SELECT id, name, pin FROM nursery ORDER BY id LIMIT 80").fetchall()
+                    st.dataframe({"농원ID":[r[0] for r in rows],
+                                  "이름":[r[1] for r in rows],
+                                  "PIN":[r[2] for r in rows]}, height=200)
+                st.caption("상인회 관리자 마스터 PIN: 0000")
+
+    # ══ 개별 농원 콘솔 ══
+    elif ss.admin_nid:
+        nid = ss.admin_nid
+        info = conn.execute("SELECT name, tagline, specialty FROM nursery WHERE id=?", (nid,)).fetchone()
+        st.markdown(f"### 🏪 {info[0]} 콘솔  ·  {zone_of(nid)}")
+
+        tab1, tab2, tab3 = st.tabs(["🌿 추천 식물 관리", "🏷️ 농원 정보", "📊 내 노출 현황"])
+
+        # --- 추천 식물(재고) 관리 ---
+        with tab1:
+            st.markdown("#### 현재 등록된 추천 식물")
+            rows = conn.execute("""SELECT plant_id, qty, price_min, price_max, updated_at
+                FROM stock WHERE nursery_id=? ORDER BY qty DESC""", (nid,)).fetchall()
+            if not rows:
+                st.caption("아직 등록된 식물이 없습니다. 아래에서 추가하세요.")
+            for pid, qty, pmin, pmax, upd in rows:
+                pname = PLANT_NAMES.get(pid, pid)
+                with st.container():
+                    cc = st.columns([3,2,2,2,1.4])
+                    cc[0].markdown(f"**{pname}**")
+                    nq = cc[1].number_input("재고", 0, 9999, int(qty), key=f"q_{pid}")
+                    npmin = cc[2].number_input("최저가", 0, 999999, int(pmin or 0),
+                                               step=1000, key=f"pmin_{pid}")
+                    npmax = cc[3].number_input("최고가", 0, 999999, int(pmax or 0),
+                                               step=1000, key=f"pmax_{pid}")
+                    if cc[4].button("💾", key=f"sv_{pid}", help="저장"):
+                        conn.execute("""UPDATE stock SET qty=?, price_min=?, price_max=?,
+                            updated_at=? WHERE nursery_id=? AND plant_id=?""",
+                            (nq, npmin, npmax, datetime.now().isoformat(), nid, pid))
+                        conn.commit(); st.toast(f"{pname} 저장됨"); st.rerun()
+                    if cc[4].button("🗑", key=f"del_{pid}", help="삭제"):
+                        conn.execute("DELETE FROM stock WHERE nursery_id=? AND plant_id=?", (nid, pid))
+                        conn.commit(); st.toast(f"{pname} 삭제됨"); st.rerun()
+
+            st.divider()
+            st.markdown("#### ➕ 추천 식물 추가")
+            have = {r[0] for r in rows}
+            avail = [(p, n) for p, n in PLANT_NAMES.items() if p not in have]
+            ac = st.columns([3,2,2,2])
+            newp = ac[0].selectbox("품종", [p for p, _ in avail],
+                                   format_func=lambda p: PLANT_NAMES[p], key="newp")
+            newq = ac[1].number_input("재고", 1, 9999, 10, key="newq")
+            newmin = ac[2].number_input("최저가", 0, 999999, 15000, step=1000, key="newmin")
+            newmax = ac[3].number_input("최고가", 0, 999999, 45000, step=1000, key="newmax")
+            if st.button("추가하기", type="primary"):
+                conn.execute("""INSERT INTO stock(nursery_id, plant_id, qty, price_min, price_max, updated_at)
+                    VALUES(?,?,?,?,?,?)""",
+                    (nid, newp, newq, newmin, newmax, datetime.now().isoformat()))
+                conn.commit(); st.toast(f"{PLANT_NAMES[newp]} 추가됨"); st.rerun()
+
+        # --- 농원 정보 ---
+        with tab2:
+            tl = st.text_input("대표 문구 (앱에 노출)", value=info[1] or "",
+                               placeholder="예: 30년 전통 대형 관엽 전문")
+            sp = st.text_input("전문 분야", value=info[2] or "",
+                               placeholder="예: 관엽/분갈이")
+            if st.button("농원 정보 저장", type="primary"):
+                conn.execute("UPDATE nursery SET tagline=?, specialty=? WHERE id=?",
+                             (tl, sp, nid)); conn.commit()
+                st.success("저장되었습니다.")
+            st.divider()
+            newpin = st.text_input("PIN 변경 (4자리)", max_chars=4, type="password")
+            if st.button("PIN 변경") and len(newpin) == 4 and newpin.isdigit():
+                conn.execute("UPDATE nursery SET pin=? WHERE id=?", (newpin, nid))
+                conn.commit(); st.success("PIN이 변경되었습니다.")
+
+        # --- 내 노출 현황 ---
+        with tab3:
+            from datetime import timedelta as _td
+            since = (datetime.now() - _td(days=7)).isoformat()
+            mine = conn.execute("SELECT COUNT(*) FROM exposure_log WHERE nursery_id=? AND ts>=?",
+                                (nid, since)).fetchone()[0]
+            allc = conn.execute("SELECT COUNT(*) FROM exposure_log WHERE ts>=?", (since,)).fetchone()[0]
+            avg = allc / 80 if allc else 0
+            ef = conn.execute("SELECT expo_factor FROM nursery WHERE id=?", (nid,)).fetchone()[0]
+            c1, c2, c3 = st.columns(3)
+            c1.metric("주간 추천 노출", f"{mine}회")
+            c2.metric("단지 평균 대비", f"{(mine/avg*100 if avg else 0):.0f}%")
+            c3.metric("현재 노출 가중치", f"{ef:.2f}")
+            st.caption("재고를 자주 갱신할수록(신선도 유지) 노출 가중치가 올라갑니다. "
+                       "가중치는 매일 04시 자동 재계산됩니다.")
+
+    # ══ 상인회 마스터 대시보드 ══
+    elif ss.is_master:
+        st.markdown("### 📊 상인회 통합 대시보드")
+        from datetime import timedelta as _td
+        since = (datetime.now() - _td(days=7)).isoformat()
+        counts = dict(conn.execute(
+            "SELECT nursery_id, COUNT(*) FROM exposure_log WHERE ts>=? GROUP BY nursery_id",
+            (since,)).fetchall())
+        allids = [r[0] for r in conn.execute("SELECT id FROM nursery").fetchall()]
+        vals = [counts.get(i, 0) for i in allids]
+        import numpy as _np
+        def _gini(x):
+            x = _np.sort(_np.array(x, float)); n = len(x)
+            if n == 0 or x.sum() == 0: return 0.0
+            cum = _np.cumsum(x); return float((n + 1 - 2*(cum/cum[-1]).sum())/n)
+        g = _gini(vals)
+        cov = sum(1 for v in vals if v > 0) / len(allids)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("지니계수", f"{g:.3f}", "목표 ≤0.35 " + ("✅" if g <= 0.35 else "⚠️"))
+        c2.metric("커버리지", f"{cov*100:.0f}%", "목표 ≥85% " + ("✅" if cov >= 0.85 else "⚠️"))
+        c3.metric("주간 총 노출", f"{sum(vals)}회")
+        st.divider()
+        st.markdown("#### 농원별 노출 · 등록 식물 수 (상위/하위)")
+        stat = conn.execute("""SELECT n.id, n.name, COUNT(DISTINCT s.plant_id) plants,
+            COALESCE(SUM(s.qty),0) stock FROM nursery n
+            LEFT JOIN stock s ON s.nursery_id=n.id GROUP BY n.id""").fetchall()
+        stat = sorted(stat, key=lambda r: counts.get(r[0], 0), reverse=True)
+        rows_show = stat[:8] + [("...","...","...","...")] + stat[-5:]
+        st.dataframe({
+            "농원":[f"{r[1]}" if r[0]!="..." else "..." for r in rows_show],
+            "등록식물":[r[2] for r in rows_show],
+            "총재고":[r[3] for r in rows_show],
+            "주간노출":[counts.get(r[0],0) if r[0]!="..." else "..." for r in rows_show],
+        }, height=430)
+        st.caption("미등록·저노출 농원을 파악해 재고 등록을 독려하세요. "
+                   "노출 편중이 심하면(지니↑) 알고리즘이 자동 보정합니다.")
+
 # ══════════════ 건강 진단 ══════════════
 elif page == "diag":
     header()
-    if st.button("← 홈으로"): go("home")
+    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
     st.markdown("## 🔍 식물 건강 진단")
     t1, t2 = st.tabs(["📷 카메라로 촬영", "📁 파일 업로드"])
     with t1: cam = st.camera_input("잎 부분을 가까이 대고 찍어주세요")
@@ -870,7 +1085,7 @@ elif page == "diag":
 # ══════════════ 농원 지도 ══════════════
 elif page == "map":
     header()
-    if st.button("← 홈으로"): go("home")
+    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
     st.markdown("## 🗺️ 농원 지도 (불로화훼단지)")
     rows = conn.execute("SELECT id, name FROM nursery").fetchall()
     rng = np.random.RandomState(7)
@@ -884,7 +1099,7 @@ elif page == "map":
 # ══════════════ 분갈이 특화 ══════════════
 elif page == "repot":
     header()
-    if st.button("← 홈으로"): go("home")
+    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
     st.markdown("## 🪴 분갈이·화분 특화 농원")
     for nid, name in conn.execute(
             "SELECT id, name FROM nursery ORDER BY RANDOM() LIMIT 6").fetchall():
@@ -895,7 +1110,7 @@ elif page == "repot":
 # ══════════════ 내 식물 관리 (물·영양) ══════════════
 elif page == "care":
     header()
-    if st.button("← 홈으로"): go("home")
+    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
     st.markdown("## 💧 내 식물 관리")
     st.caption("우리 집 식물의 물 주기·영양제 일정을 관리하세요.")
 
