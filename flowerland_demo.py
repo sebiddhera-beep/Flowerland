@@ -386,6 +386,86 @@ ss = st.session_state
 ss.setdefault("page", "home")
 ss.setdefault("face_step", 1); ss.setdefault("space_step", 1)
 def go(p): ss.page = p; st.rerun()
+
+def show_plant_intro(name, registered):
+    """API(제미나이)로 식물 유형·특징·관리법 소개. 키 없으면 DB 기본정보 폴백."""
+    tag = "🤖 Gemini" if gemini_on() else "기본 정보"
+    if gemini_on():
+        with st.spinner(f"'{name}' 식물 정보를 AI로 분석 중..."):
+            names = "、".join(PLANT_NAMES.values())
+            prompt = (
+                f"너는 원예 전문가다. 식물 '{name}'을 소개한다.\n"
+                f"아래 JSON만 출력(마크다운·설명 금지):\n"
+                '{"exists": true/false, "sci":"학명", "type":"분류(관엽/다육/화초/허브 등)", '
+                '"summary":"특징 한줄(45자내)", "light":"광 요구", "water":"물주기", '
+                '"level":"난이도(초보/중급/고수)", "similar":["유사품종 최대3개"]}\n'
+                f"'similar'는 반드시 이 목록에서만: {names}\n"
+                f"'{name}'이 식물이 아니면 exists=false.")
+            try:
+                info = gm.ask_json(api_key, prompt)
+            except Exception as e:
+                st.error(f"AI 조회 실패: {type(e).__name__} — 기본 정보로 대체")
+                info = None
+        if info and info.get("exists"):
+            ss.last_similar = info.get("similar", [])
+            st.markdown(
+                f"<div class='result'><b style='font-size:19px'>{name}</b> "
+                f"<span style='color:#888'>{info.get('sci','')}</span> "
+                f"<span class='chip'>{tag}</span><br>"
+                f"<b>유형</b>: {info.get('type','-')} · <b>난이도</b>: {info.get('level','-')}<br>"
+                f"{info.get('summary','')}<br>"
+                f"☀️ {info.get('light','-')} &nbsp; 💧 {info.get('water','-')}</div>",
+                unsafe_allow_html=True)
+            return
+    # ── 폴백: DB 마스터의 기본 정보 (plant 테이블 있으면 사용) ──
+    if name in NAME_TO_PID:
+        try:
+            pid = NAME_TO_PID[name]
+            row = conn.execute("SELECT care_level, light_need, water_cycle "
+                               "FROM plant WHERE id=?", (pid,)).fetchone()
+        except Exception:
+            row = None
+        if row:
+            st.markdown(
+                f"<div class='result'><b style='font-size:19px'>{name}</b> "
+                f"<span class='chip'>{tag}</span><br>"
+                f"난이도 {row[0]} · ☀️ {row[1]} · 💧 {row[2]}일 주기</div>",
+                unsafe_allow_html=True)
+            return
+        st.markdown(
+            f"<div class='result'><b style='font-size:19px'>{name}</b> "
+            f"<span class='chip'>단지 취급 품종</span><br>"
+            "이 품종은 단지에서 취급 중입니다. 아래에서 취급 농원을 확인하세요.</div>",
+            unsafe_allow_html=True)
+        return
+    st.info(f"'{name}'의 상세 정보가 준비되지 않았습니다. "
+            "(사이드바에서 Gemini 키를 연결하면 AI 소개가 표시됩니다)")
+
+def show_stock_nurseries(pid, compact=False):
+    """DB에서 해당 품종 취급 농원·재고 표시 + 트래픽 분배 추천 회원사."""
+    rows = conn.execute("""
+        SELECT s.nursery_id, n.name, s.qty, s.updated_at
+        FROM stock s JOIN nursery n ON n.id = s.nursery_id
+        WHERE s.plant_id = ? AND s.qty > 0
+        ORDER BY s.qty DESC""", (pid,)).fetchall()
+    if not rows:
+        st.error(f"현재 '{PLANT_NAMES.get(pid,'')}' 재고 보유 농원이 없습니다.")
+        return
+    total = sum(r[2] for r in rows)
+    st.markdown(f"<div class='nursery'>취급 농원 <b>{len(rows)}곳</b> · "
+                f"단지 총 재고 <b>{total}개</b></div>", unsafe_allow_html=True)
+    for nid, name, qty, upd in (rows if not compact else rows[:2]):
+        fresh = "🟢" if (upd and upd >= "2026") else "🟡"
+        st.markdown(
+            f"<div class='nursery'>🏪 <b>{name}</b> ({nid}) · {zone_of(nid)}"
+            f"<br>재고 <b>{qty}개</b> {fresh} · 📍 지도 · 📞 전화</div>",
+            unsafe_allow_html=True)
+    if not compact:
+        st.caption("🟢 재고 최근 갱신 · 🟡 갱신 필요(72h 기준)")
+        b = best_nursery(pid, "search")
+        if b:
+            st.markdown("#### ⭐ 오늘의 추천 회원사 (트래픽 분배)")
+            best_card(b, pid)
 def header():
     c1, c2 = st.columns([3, 1])
     if asset("FL_Land.png"):
@@ -705,46 +785,43 @@ elif page == "search":
     header()
     if st.button("← 홈으로"): go("home")
     st.markdown("## 🔎 식물 검색")
-    st.caption("찾는 식물이 단지 내 어느 회원사(농원)에 있는지 검색합니다.")
+    st.caption("① AI가 식물 유형·특징을 소개하고 ② DB에서 취급 농원(재고)을 안내합니다.")
     q = st.text_input("식물 이름", value=ss.get("search_q", ""),
-                      placeholder="예: 몬스테라, 수국, 호접란")
+                      placeholder="예: 몬스테라, 수국, 필로덴드론 버킨")
+
     if q.strip():
         term = q.strip()
         hits = [(pid, nm) for pid, nm in PLANT_NAMES.items() if term in nm]
-        if not hits:
-            st.warning(f"'{term}'와(과) 일치하는 품종이 없습니다. 다른 이름으로 검색해 보세요.")
+
+        # 품종 확정: DB 매칭 우선, 없으면 None(=미등록)
+        pid = None
+        if hits:
+            pid = (st.radio("품종 선택", [h[0] for h in hits],
+                            format_func=lambda p: PLANT_NAMES[p], horizontal=True)
+                   if len(hits) > 1 else hits[0][0])
+            disp_name = PLANT_NAMES[pid]
         else:
-            if len(hits) > 1:
-                pid = st.radio("품종 선택", [h[0] for h in hits],
-                               format_func=lambda p: PLANT_NAMES[p], horizontal=True)
+            disp_name = term
+
+        # ── ① API(제미나이): 식물 유형·소개 ──────────────────────
+        st.markdown("### 🌿 식물 소개")
+        show_plant_intro(disp_name, registered=bool(pid))
+
+        # ── ② DB: 취급 농원·재고 ────────────────────────────────
+        st.markdown("### 🏪 어느 농원에 있나요")
+        if pid:
+            show_stock_nurseries(pid)
+        else:
+            # 미등록 품종 → AI가 뽑은 유사 품종의 농원 안내
+            sim = [s for s in ss.get("last_similar", []) if s in NAME_TO_PID][:3]
+            if sim:
+                st.caption(f"'{term}'은(는) 아직 단지 미취급 품종입니다. "
+                           "AI가 추천한 유사 품종의 취급 농원을 안내합니다.")
+                for snm in sim:
+                    st.markdown(f"**🌿 {snm}** (유사 품종)")
+                    show_stock_nurseries(NAME_TO_PID[snm], compact=True)
             else:
-                pid = hits[0][0]
-            rows = conn.execute("""
-                SELECT s.nursery_id, n.name, s.qty, s.updated_at
-                FROM stock s JOIN nursery n ON n.id = s.nursery_id
-                WHERE s.plant_id = ? AND s.qty > 0
-                ORDER BY s.qty DESC""", (pid,)).fetchall()
-            if not rows:
-                st.error(f"현재 '{PLANT_NAMES[pid]}' 재고를 보유한 회원사가 없습니다.")
-            else:
-                total = sum(r[2] for r in rows)
-                st.markdown(f"<div class='result'><b style='font-size:19px'>🌿 "
-                            f"{PLANT_NAMES[pid]}</b><br>취급 회원사 <b>{len(rows)}곳</b> · "
-                            f"단지 총 재고 <b>{total}개</b></div>", unsafe_allow_html=True)
-                fb = st.checkbox("재고 많은 순 정렬", value=True)
-                if not fb:
-                    rows = sorted(rows, key=lambda r: r[0])
-                for nid, name, qty, upd in rows:
-                    fresh = "🟢" if (upd and upd >= "2026") else "🟡"
-                    st.markdown(
-                        f"<div class='nursery'>🏪 <b>{name}</b> ({nid}) · {zone_of(nid)}"
-                        f"<br>재고 <b>{qty}개</b> {fresh} · 📍 지도 보기 · 📞 전화 연결</div>",
-                        unsafe_allow_html=True)
-                st.caption("🟢 재고 최근 갱신 · 🟡 갱신 필요 (실서비스: 72시간 기준)")
-                b = best_nursery(pid, "fun07")
-                if b:
-                    st.markdown("#### 오늘의 추천 회원사 (트래픽 분배 적용)")
-                    best_card(b, pid)
+                st.info("단지 내 취급 농원 정보가 없습니다. 농원에 직접 문의해 보세요.")
 
 # ══════════════ 건강 진단 ══════════════
 elif page == "diag":
