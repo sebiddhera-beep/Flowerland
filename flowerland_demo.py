@@ -20,6 +20,7 @@ import base64
 import hashlib
 import io
 import os
+import tempfile
 import random
 import sqlite3
 from datetime import datetime, date, timedelta
@@ -27,6 +28,12 @@ from datetime import datetime, date, timedelta
 import numpy as np
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
+
+try:  # 후면 카메라 컴포넌트 (없으면 기본 카메라로 폴백)
+    from streamlit_back_camera_input import back_camera_input
+    HAS_BACK_CAM = True
+except Exception:
+    HAS_BACK_CAM = False
 
 import traffic_dispatch as td
 
@@ -91,6 +98,12 @@ h1,h2,h3 {{ color:{GREEN}; }}
     background: #0D47A1 !important;
     transform: translateY(-1px);
     transition: all .15s;
+}}
+
+/* ── TOP5 일러스트 카드 이름표 ── */
+.top5-name {{
+    text-align: center; font-size: 12.5px; font-weight: 700;
+    color: #2E5D32; margin-top: -6px; line-height: 1.3;
 }}
 
 /* ── TOP5 카드 버튼 (key='top_*') ── */
@@ -304,11 +317,12 @@ def _b64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-def clickable_image(path, key, aspect="351/416"):
-    """이미지 전체가 버튼으로 동작. 클릭하면 True 반환 (세션 유지됨)."""
+def clickable_image(path, key, aspect="351/416", fit="100% 100%"):
+    """이미지 전체가 버튼으로 동작. 클릭하면 True 반환 (세션 유지됨).
+    fit="contain"이면 종횡비를 유지한 채 카드 안에 맞춤 (TOP5 일러스트용)."""
     st.markdown(f"""<style>
     .st-key-{key} button {{
-        background: url("data:image/png;base64,{_b64(path)}") center / 100% 100% no-repeat;
+        background: url("data:image/png;base64,{_b64(path)}") center / {fit} no-repeat;
         width: 100%; aspect-ratio: {aspect}; height: auto;
         border-radius: 16px; border: 1px solid #e3e3e3;
     }}
@@ -319,6 +333,52 @@ def clickable_image(path, key, aspect="351/416"):
     .st-key-{key} button p, .st-key-{key} button div {{ color: transparent !important; }}
     </style>""", unsafe_allow_html=True)
     return st.button("\u200b", key=key, use_container_width=True)
+
+@st.cache_data
+def _thumb(path, max_px=480):
+    """대용량 일러스트를 카드용으로 축소한 PNG 경로 반환.
+    원본 1~6MB PNG를 base64로 그대로 심으면 홈 화면이 20MB를 넘어
+    모바일에서 느려지므로, 커패시터 용량 낮추듯 전송량을 줄인다."""
+    try:
+        im = Image.open(path)
+        if max(im.size) <= max_px:
+            return path
+        im.thumbnail((max_px, max_px))
+        out = os.path.join(tempfile.gettempdir(),
+                           f"flthumb_{max_px}_{os.path.basename(path)}")
+        if not os.path.exists(out):
+            im.save(out, "PNG", optimize=True)
+        return out
+    except Exception:
+        return path
+
+def camera_capture(key, front_default=True):
+    """전면/후면 전환 버튼이 붙은 카메라. 촬영 결과(bytes 지원 객체) 반환.
+    - 전면: st.camera_input (버튼 문구는 CSS로 '촬영' 한글화)
+    - 후면: streamlit_back_camera_input (화면 터치로 촬영)
+    RS-485 반이중처럼 한 시점엔 한 카메라만 활성화된다."""
+    # Take Photo → 촬영 (위젯 내부 버튼 문구 한글화)
+    st.markdown("""<style>
+    [data-testid="stCameraInputButton"] { font-size: 0 !important; }
+    [data-testid="stCameraInputButton"] * { font-size: 0 !important; }
+    [data-testid="stCameraInputButton"]::after {
+        content: "📸 촬영"; font-size: 14px; font-weight: 700;
+    }
+    div[class*="st-key-cammode_"] { margin-bottom: -8px; }
+    </style>""", unsafe_allow_html=True)
+    options = ["🤳 전면 카메라", "📷 후면 카메라"]
+    mode = st.radio("촬영 카메라", options,
+                    index=0 if front_default else 1,
+                    horizontal=True, key=f"cammode_{key}",
+                    label_visibility="collapsed")
+    if mode == options[1]:
+        if HAS_BACK_CAM:
+            st.caption("📷 후면 카메라 — 화면을 터치하면 촬영됩니다")
+            return back_camera_input(key=f"cam_back_{key}")
+        st.info("후면 카메라 모듈이 없어 기본 카메라로 표시합니다 "
+                "(requirements.txt에 streamlit-back-camera-input 추가 필요).")
+    return st.camera_input("촬영", key=f"cam_front_{key}",
+                           label_visibility="collapsed")
 
 # ── PIL 유틸 (일러스트/합성/카드/QR) ─────────────────────────────────────────
 def find_font(size):
@@ -590,14 +650,28 @@ if page == "home":
                     go(tgt)
     st.write("")
     st.markdown("#### 실시간 단지 인기 식물 TOP 5")
+    # 고해상도 일러스트 이미지 카드 (PNG 없는 식물은 이모지 카드로 자동 폴백)
+    TOP5_IMG = {"P001": "1_MON.png",    # 1위 몬스테라
+                "P002": "2_SKIN.png",   # 2위 스킨답서스
+                "P003": "3_Cal.png",    # 3위 칼라데아
+                "P009": "4_SANSE.png",  # 4위 산세베리아
+                "P036": "5_BOS_GO.png"} # 5위 보스턴고사리
     cols = st.columns(5)
     for rank, (pid, em, col) in enumerate(zip(
-            ["P001", "P002", "P003", "P009", "P006"], "🌿🍃🌱🪴🌳", cols), 1):
+            ["P001", "P002", "P003", "P009", "P036"], "🌿🍃🌱🪴🌿", cols), 1):
         with col:
-            label = f"{em}\n{rank}. {PLANT_NAMES[pid]}"
-            if st.button(label, key=f"top_{pid}", use_container_width=True):
-                ss.plant_pid = pid
-                go("plant")
+            img = asset(TOP5_IMG[pid]) if pid in TOP5_IMG else None
+            if img:
+                if clickable_image(_thumb(img), f"imgbtn_top_{pid}", "2/3", fit="contain"):
+                    ss.plant_pid = pid
+                    go("plant")
+                st.markdown(f"<div class='top5-name'>{rank}. {PLANT_NAMES[pid]}</div>",
+                            unsafe_allow_html=True)
+            else:
+                label = f"{em}\n{rank}. {PLANT_NAMES[pid]}"
+                if st.button(label, key=f"top_{pid}", use_container_width=True):
+                    ss.plant_pid = pid
+                    go("plant")
     st.caption("※ 초기 시연 — AI 분석은 규칙 기반 목업, 농원 선정은 실제 가중 랜덤 알고리즘 동작")
     st.write("")
     with st.expander("🔑 회원사 · 상인회 로그인"):
@@ -640,7 +714,7 @@ elif page == "face":
         st.markdown("<div class='big'>분석할 셀카를 찍어주세요</div>", unsafe_allow_html=True)
         st.caption("(A single, best photo is recommended)")
         t1, t2 = st.tabs(["📷 직접 촬영하기", "🖼️ 갤러리에서 선택"])
-        with t1: cam = st.camera_input("촬영", label_visibility="collapsed")  # ◀ "노트북 카메라"에서 "촬영"으로 한글화
+        with t1: cam = camera_capture("face", front_default=True)  # ◀ 촬영 한글화 + 전·후면 전환
         with t2: fil = st.file_uploader("파일", type=["jpg", "jpeg", "png"],
                                         label_visibility="collapsed")
         up = cam or fil
@@ -728,7 +802,7 @@ elif page == "space":
         ss.room = st.selectbox("공간 유형",
                                list(INDOOR_RECS.keys()) + list(OUTDOOR_RECS.keys()))
         t1, t2 = st.tabs(["📷 직접 촬영하기", "🖼️ 갤러리에서 선택"])
-        with t1: cam = st.camera_input("카메라", label_visibility="collapsed")
+        with t1: cam = camera_capture("space", front_default=False)  # ◀ 공간 촬영은 후면 기본
         with t2: fil = st.file_uploader("파일", type=["jpg", "jpeg", "png"],
                                         label_visibility="collapsed")
         up = cam or fil
@@ -1085,7 +1159,9 @@ elif page == "diag":
     if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
     st.markdown("## 🔍 식물 건강 진단")
     t1, t2 = st.tabs(["📷 카메라로 촬영", "📁 파일 업로드"])
-    with t1: cam = st.camera_input("잎 부분을 가까이 대고 찍어주세요")
+    with t1:
+        st.caption("잎 부분을 가까이 대고 찍어주세요")
+        cam = camera_capture("diag", front_default=False)  # ◀ 잎 촬영은 후면 기본
     with t2: fil = st.file_uploader("시든 식물 사진", type=["jpg", "jpeg", "png"])
     up = cam or fil
     if up and st.button("🩺 진단하기", type="primary", use_container_width=True):

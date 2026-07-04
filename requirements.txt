@@ -1,5 +1,6 @@
- streamlit
-   numpy
-   pillow
-   qrcode
-   requests
+streamlit
+numpy
+pillow
+qrcode
+requests
+streamlit-back-camera-input
