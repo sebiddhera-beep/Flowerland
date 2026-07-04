@@ -93,6 +93,26 @@ h1,h2,h3 {{ color:{GREEN}; }}
     transition: all .15s;
 }}
 
+/* ── TOP5 카드 버튼 (key='top_*') ── */
+[class*="st-key-top_"] button {{
+    background: #f7fbf7 !important;
+    border: 1px solid #dcecdc !important;
+    border-radius: 12px !important;
+    min-height: 118px !important;
+    padding: 10px 6px !important;
+    color: #222 !important;
+    white-space: pre-line !important;   /* \\n 줄바꿈 표시 */
+    line-height: 1.35 !important;
+    font-size: 12px !important;
+}}
+[class*="st-key-top_"] button p {{ white-space: pre-line !important; }}
+[class*="st-key-top_"] button:hover {{
+    border-color: #2E7D32 !important;
+    box-shadow: 0 3px 10px rgba(46,125,50,.25) !important;
+    transform: translateY(-2px);
+    transition: all .15s;
+}}
+
 /* ── 모바일 대응 (갤럭시 S24: 뷰포트 약 384px) ─────────────────────
    Streamlit은 좁은 화면에서 컬럼을 세로로 쌓아버리므로,
    배너 2열·아이콘 4열·TOP5 5열이 목업처럼 가로로 유지되게 강제한다. */
@@ -575,12 +595,9 @@ if page == "home":
             ["P001", "P002", "P003", "P009", "P006"], "🌿🍃🌱🪴🌳", cols), 1):
         with col:
             b = best_nursery(pid, "fun07")
-            st.markdown(f"<div class='top5'><div style='font-size:32px'>{em}</div>"
-                        f"<b>{rank}. {PLANT_NAMES[pid]}</b><br>"
-                        f"<span style='font-size:11px;color:#777'>{b['name'] if b else '-'}"
-                        f"<br>💬 {random.randint(8, 15)}개</span></div>",
-                        unsafe_allow_html=True)
-            if st.button("자세히", key=f"top_{pid}", use_container_width=True):
+            nm = b['name'] if b else '-'
+            label = f"{em}\n{rank}. {PLANT_NAMES[pid]}\n{nm} · 💬{random.randint(8,15)}"
+            if st.button(label, key=f"top_{pid}", use_container_width=True):
                 ss.plant_pid = pid
                 go("plant")
     st.caption("※ 초기 시연 — AI 분석은 규칙 기반 목업, 농원 선정은 실제 가중 랜덤 알고리즘 동작")
