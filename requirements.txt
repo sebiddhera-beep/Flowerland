@@ -3,4 +3,3 @@ numpy
 pillow
 qrcode
 requests
-streamlit-back-camera-input

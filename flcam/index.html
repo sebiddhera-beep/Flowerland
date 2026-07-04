@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin:0; padding:0; background:transparent;
+               font-family:'Malgun Gothic','Noto Sans KR',sans-serif; }
+  .wrap { width:100%; }
+  /* 전·후면 모두 동일한 3:4 고정 프레임 (object-fit:cover로 꽉 채움) */
+  .cam  { position:relative; width:100%; aspect-ratio:3/4; background:#111;
+          border-radius:14px; overflow:hidden; }
+  video, img#p { width:100%; height:100%; object-fit:cover; display:block; }
+  video.mirror { transform:scaleX(-1); }   /* 전면은 거울 모드 프리뷰 */
+  .badge { position:absolute; top:8px; left:8px; background:rgba(0,0,0,.45);
+           color:#fff; font-size:11px; padding:3px 9px; border-radius:10px; }
+  .bar  { display:flex; gap:8px; align-items:stretch; margin-top:8px; }
+  button { border:1px solid #ccc; border-radius:10px; background:#fff;
+           cursor:pointer; font-size:14px; font-weight:700; }
+  #shot   { flex:1; padding:10px 0; background:#2E7D32; color:#fff; border-color:#2E7D32; }
+  #flip   { width:52px; display:flex; align-items:center; justify-content:center; }
+  #retake { flex:1; padding:10px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cam">
+    <video id="v" autoplay playsinline muted></video>
+    <img id="p" style="display:none">
+    <div class="badge" id="badge">카메라 준비 중…</div>
+  </div>
+  <div class="bar" id="livebar">
+    <button id="shot">&#128248; 촬영</button>
+    <button id="flip" title="전면/후면 전환" aria-label="카메라 전환">
+      <!-- 표준 카메라 전환 아이콘 (카메라 + 순환 화살표) -->
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+           stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 5h-3.2L15 3H9L7.2 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/>
+        <path d="M15.5 12a3.5 3.5 0 0 1-6 2.4"/>
+        <path d="M8.5 12a3.5 3.5 0 0 1 6-2.4"/>
+        <polyline points="15.2 8.2 14.9 10.1 13 9.8"/>
+        <polyline points="8.8 15.8 9.1 13.9 11 14.2"/>
+      </svg>
+    </button>
+  </div>
+  <div class="bar" id="donebar" style="display:none">
+    <button id="retake">&#8617; 다시 찍기</button>
+  </div>
+</div>
+<script>
+  // ── Streamlit 컴포넌트 통신 (postMessage 프로토콜) ──
+  const S = (type, data) => window.parent.postMessage(
+      Object.assign({ isStreamlitMessage: true, type: type }, data || {}), "*");
+  const setVal = v => S("streamlit:setComponentValue", { dataType: "json", value: v });
+  const setH   = () => S("streamlit:setFrameHeight",
+                         { height: document.body.scrollHeight + 4 });
+
+  let front = true, stream = null, inited = false;
+  const v = document.getElementById("v"), p = document.getElementById("p"),
+        badge = document.getElementById("badge");
+
+  async function start() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    const want = front ? "user" : "environment";
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(
+          { video: { facingMode: { ideal: want } }, audio: false });
+    } catch (e) {
+      try {  // 해당 방향 카메라가 없으면 아무 카메라라도
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      } catch (e2) {
+        badge.textContent = "카메라 권한을 허용해 주세요";
+        return;
+      }
+    }
+    v.srcObject = stream;
+    v.classList.toggle("mirror", front);
+    badge.textContent = front ? "전면 카메라" : "후면 카메라";
+    setH();
+  }
+
+  document.getElementById("flip").onclick = () => { front = !front; start(); };
+
+  document.getElementById("shot").onclick = () => {
+    if (!v.videoWidth) return;
+    const c = document.createElement("canvas");
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    const ctx = c.getContext("2d");
+    if (front) {  // 전면은 거울 프리뷰 그대로 저장 (보이는 대로)
+      ctx.translate(c.width, 0); ctx.scale(-1, 1);
+    }
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    const url = c.toDataURL("image/jpeg", 0.92);
+    p.src = url; p.style.display = "block"; v.style.display = "none";
+    document.getElementById("livebar").style.display = "none";
+    document.getElementById("donebar").style.display = "flex";
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    setVal(url); setH();
+  };
+
+  document.getElementById("retake").onclick = () => {
+    p.style.display = "none"; v.style.display = "block";
+    document.getElementById("donebar").style.display = "none";
+    document.getElementById("livebar").style.display = "flex";
+    setVal(null); start(); setH();
+  };
+
+  // Streamlit → 컴포넌트: 초기 인자(front 기본값) 수신
+  window.addEventListener("message", e => {
+    const d = e.data;
+    if (!d || d.type !== "streamlit:render") return;
+    if (!inited) {
+      inited = true;
+      if (d.args && typeof d.args.front === "boolean") front = d.args.front;
+      start();
+    }
+    setH();
+  });
+
+  S("streamlit:componentReady", { apiVersion: 1 });
+  setH(); setTimeout(setH, 300); setTimeout(setH, 1200);
+</script>
+</body>
+</html>

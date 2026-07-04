@@ -27,13 +27,8 @@ from datetime import datetime, date, timedelta
 
 import numpy as np
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image, ImageDraw, ImageFont
-
-try:  # 후면 카메라 컴포넌트 (없으면 기본 카메라로 폴백)
-    from streamlit_back_camera_input import back_camera_input
-    HAS_BACK_CAM = True
-except Exception:
-    HAS_BACK_CAM = False
 
 import traffic_dispatch as td
 
@@ -305,6 +300,12 @@ def img_hash(b: bytes) -> int:
 
 # ── 이미지 에셋: assets 폴더(또는 같은 폴더)에 PNG가 있으면 자동 사용 ──
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ── 자체 카메라 컴포넌트 (전·후면 전환 아이콘 내장) ──
+_FLCAM_DIR = os.path.join(_BASE_DIR, "flcam")
+HAS_FLCAM = os.path.exists(os.path.join(_FLCAM_DIR, "index.html"))
+if HAS_FLCAM:
+    _flcam = components.declare_component("flcam", path=_FLCAM_DIR)
 def asset(name):
     for d in (os.path.join(_BASE_DIR, "assets"), _BASE_DIR):
         p = os.path.join(d, name)
@@ -353,30 +354,25 @@ def _thumb(path, max_px=480):
         return path
 
 def camera_capture(key, front_default=True):
-    """전면/후면 전환 버튼이 붙은 카메라. 촬영 결과(bytes 지원 객체) 반환.
-    - 전면: st.camera_input (버튼 문구는 CSS로 '촬영' 한글화)
-    - 후면: streamlit_back_camera_input (화면 터치로 촬영)
-    RS-485 반이중처럼 한 시점엔 한 카메라만 활성화된다."""
-    # Take Photo → 촬영 (위젯 내부 버튼 문구 한글화)
+    """촬영 버튼 옆 전환 아이콘(🔄) 하나로 전·후면을 오가는 카메라.
+    전·후면 모두 동일한 3:4 프레임 크기. 촬영 결과는 BytesIO(JPEG) 반환
+    — 기존 up.getvalue() 호출부와 그대로 호환."""
+    if HAS_FLCAM:
+        data = _flcam(front=bool(front_default), key=f"flcam_{key}", default=None)
+        if data:
+            try:
+                return io.BytesIO(base64.b64decode(data.split(",", 1)[-1]))
+            except Exception:
+                return None
+        return None
+    # 폴백: flcam 폴더가 배포에 없으면 기본 카메라 (버튼 문구만 촬영으로)
     st.markdown("""<style>
     [data-testid="stCameraInputButton"] { font-size: 0 !important; }
     [data-testid="stCameraInputButton"] * { font-size: 0 !important; }
     [data-testid="stCameraInputButton"]::after {
         content: "📸 촬영"; font-size: 14px; font-weight: 700;
     }
-    div[class*="st-key-cammode_"] { margin-bottom: -8px; }
     </style>""", unsafe_allow_html=True)
-    options = ["🤳 전면 카메라", "📷 후면 카메라"]
-    mode = st.radio("촬영 카메라", options,
-                    index=0 if front_default else 1,
-                    horizontal=True, key=f"cammode_{key}",
-                    label_visibility="collapsed")
-    if mode == options[1]:
-        if HAS_BACK_CAM:
-            st.caption("📷 후면 카메라 — 화면을 터치하면 촬영됩니다")
-            return back_camera_input(key=f"cam_back_{key}")
-        st.info("후면 카메라 모듈이 없어 기본 카메라로 표시합니다 "
-                "(requirements.txt에 streamlit-back-camera-input 추가 필요).")
     return st.camera_input("촬영", key=f"cam_front_{key}",
                            label_visibility="collapsed")
 
