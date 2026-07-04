@@ -22,6 +22,7 @@ import io
 import os
 import random
 import sqlite3
+from datetime import datetime, date, timedelta
 
 import numpy as np
 import streamlit as st
@@ -987,8 +988,7 @@ elif page == "admin":
 
         # --- 내 노출 현황 ---
         with tab3:
-            from datetime import timedelta as _td
-            since = (datetime.now() - _td(days=7)).isoformat()
+            since = (datetime.now() - timedelta(days=7)).isoformat()
             mine = conn.execute("SELECT COUNT(*) FROM exposure_log WHERE nursery_id=? AND ts>=?",
                                 (nid, since)).fetchone()[0]
             allc = conn.execute("SELECT COUNT(*) FROM exposure_log WHERE ts>=?", (since,)).fetchone()[0]
@@ -1004,8 +1004,7 @@ elif page == "admin":
     # ══ 상인회 마스터 대시보드 ══
     elif ss.is_master:
         st.markdown("### 📊 상인회 통합 대시보드")
-        from datetime import timedelta as _td
-        since = (datetime.now() - _td(days=7)).isoformat()
+        since = (datetime.now() - timedelta(days=7)).isoformat()
         counts = dict(conn.execute(
             "SELECT nursery_id, COUNT(*) FROM exposure_log WHERE ts>=? GROUP BY nursery_id",
             (since,)).fetchall())
@@ -1114,7 +1113,6 @@ elif page == "care":
     st.markdown("## 💧 내 식물 관리")
     st.caption("우리 집 식물의 물 주기·영양제 일정을 관리하세요.")
 
-    from datetime import date, timedelta
     # 데모용 초기 식물 2개 (세션 유지)
     if "myplants" not in ss:
         ss.myplants = [
