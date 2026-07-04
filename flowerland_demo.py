@@ -580,12 +580,39 @@ if page == "home":
                         f"<span style='font-size:11px;color:#777'>{b['name'] if b else '-'}"
                         f"<br>💬 {random.randint(8, 15)}개</span></div>",
                         unsafe_allow_html=True)
+            if st.button("자세히", key=f"top_{pid}", use_container_width=True):
+                ss.plant_pid = pid
+                go("plant")
     st.caption("※ 초기 시연 — AI 분석은 규칙 기반 목업, 농원 선정은 실제 가중 랜덤 알고리즘 동작")
     st.write("")
     with st.expander("🔑 회원사 · 상인회 로그인"):
         st.caption("농원주는 자기 농원의 추천 식물을 직접 등록·편집할 수 있습니다.")
         if st.button("회원사 관리자 모드 들어가기", use_container_width=True):
             go("admin")
+
+# ══════════════ 식물 상세 (TOP5 등에서 진입) ══════════════
+elif page == "plant":
+    header()
+    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    pid = ss.get("plant_pid")
+    if not pid or pid not in PLANT_NAMES:
+        st.warning("식물 정보를 찾을 수 없습니다.")
+        st.stop()
+    name = PLANT_NAMES[pid]
+    st.markdown(f"## 🌿 {name}")
+
+    # ① API(제미나이): 식물 유형·소개
+    st.markdown("### 식물 소개")
+    show_plant_intro(name, registered=True)
+
+    # ② DB: 취급 농원·재고
+    st.markdown("### 🏪 어느 농원에 있나요")
+    show_stock_nurseries(pid)
+
+    st.write("")
+    if st.button("🔎 다른 식물 검색하기", use_container_width=True):
+        ss.search_q = ""
+        go("search")
 
 # ══════════════ 얼굴 & MBTI (3단계) ══════════════
 elif page == "face":
