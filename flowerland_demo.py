@@ -70,7 +70,12 @@ h1,h2,h3 {{ color:{GREEN}; }}
 .top5 {{ background:#f7fbf7; border:1px solid #dcecdc; border-radius:12px;
         padding:8px; text-align:center; }}
 .result {{ background:#f0f7f0; border-left:5px solid {GREEN}; border-radius:8px;
-          padding:14px; margin-top:10px; }}
+          padding:14px; margin-top:10px; color:#1b1b1b !important; }}
+.result b {{ color:#1b3a1b !important; }}
+/* ── 밝은 배경 카드 공통: 다크 테마에서 흰 글자 상속 방지 ── */
+.icon-card, .acard, .top5, .nursery, .stampbn, .best {{ color:#1b1b1b !important; }}
+.icon-card *, .acard *, .top5 *, .nursery *, .stampbn *, .best * {{ color:inherit; }}
+.icon-card .s, .acard .s {{ color:#555 !important; }}
 .best {{ background:#fffdf3; border:2px solid #e8c34a; border-radius:14px; padding:12px; }}
 .best .tag {{ background:#e8c34a; color:#5b4300; font-weight:800; font-size:12px;
              border-radius:8px; padding:2px 8px; }}
