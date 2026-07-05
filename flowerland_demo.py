@@ -169,8 +169,24 @@ with st.sidebar:
                             help="aistudio.google.com 에서 무료 발급 → 붙여넣기")
     if api_key:
         st.success("🤖 Gemini 실 AI 분석 모드")
+        if st.button("🔌 연결 테스트", use_container_width=True):
+            try:
+                with st.spinner("Gemini 호출 중..."):
+                    r = gm.ask_json(api_key, '{"ok": true} 를 그대로 반환하시오.')
+                st.success(f"연결 정상 ✓ (응답: {r})")
+            except Exception as e:
+                st.error(f"연결 실패: {type(e).__name__}\n\n{str(e)[:300]}")
+                st.caption("키는 aistudio.google.com 발급분(AIza로 시작)이어야 하며, "
+                           "Secrets 형식은 GEMINI_API_KEY = \"AIza...\" 입니다.")
     else:
         st.info("키가 없으면 규칙 기반 목업 모드로 동작합니다.")
+        st.caption("배포(Streamlit Cloud)에서는 Manage app → Settings → Secrets에\n"
+                   'GEMINI_API_KEY = "AIza..." 형식으로 저장하세요.')
+    if not any(os.path.exists(p) for p in
+               ("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+                r"C:\Windows\Fonts\malgun.ttf")):
+        st.warning("⚠️ 한글 폰트 미설치 — 결과 카드 글씨가 깨집니다. "
+                   "저장소에 packages.txt(내용: fonts-nanum)를 올려주세요.")
     st.caption("모델: gemini-2.5-flash (분석)\n/ gemini-2.5-flash-image (합성)")
 
 def gemini_on():
@@ -378,9 +394,19 @@ def camera_capture(key, front_default=True):
 
 # ── PIL 유틸 (일러스트/합성/카드/QR) ─────────────────────────────────────────
 def find_font(size):
-    for path in [r"C:\Windows\Fonts\malgunbd.ttf", r"C:\Windows\Fonts\malgun.ttf",
-                 "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
-                 "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"]:
+    """한글 TTF 탐색: 윈도우 → 저장소 동봉(assets/fonts) → 리눅스 표준 경로
+    → 시스템 전체 글롭. packages.txt(fonts-nanum) 설치 시 나눔고딕이 잡힌다."""
+    import glob as _glob
+    cands = [r"C:\Windows\Fonts\malgunbd.ttf", r"C:\Windows\Fonts\malgun.ttf"]
+    cands += sorted(_glob.glob(os.path.join(_BASE_DIR, "assets", "fonts", "*.tt*")))
+    cands += ["/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+              "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+              "/usr/share/fonts/truetype/nanum/NanumBarunGothicBold.ttf",
+              "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+              "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"]
+    cands += sorted(_glob.glob("/usr/share/fonts/**/*Nanum*", recursive=True))
+    cands += sorted(_glob.glob("/usr/share/fonts/**/*CJK*", recursive=True))
+    for path in cands:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)
