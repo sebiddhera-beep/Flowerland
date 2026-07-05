@@ -23,6 +23,7 @@ import os
 import tempfile
 import random
 import sqlite3
+import urllib.parse
 from datetime import datetime, date, timedelta
 
 import numpy as np
@@ -300,6 +301,14 @@ def best_nursery(pid, source):
             "qty": qty[0] if qty else 0,
             "recs": 2800 + int(hashlib.md5(nid.encode()).hexdigest(), 16) % 900}
 
+def kakao_map_url(nursery_name):
+    """농원 이름 + 불로화훼단지 주소로 카카오맵 검색 링크 생성.
+    좌표(위경도) 없이도 동작. 앱 없어도 브라우저에서 열림.
+    나중에 nursery 테이블에 lat/lng 컬럼을 넣으면
+    https://map.kakao.com/link/to/{이름},{위도},{경도} 방식으로 교체 가능."""
+    q = urllib.parse.quote(f"{nursery_name} 대구 동구 불로동 화훼단지")
+    return f"https://map.kakao.com/?q={q}"
+
 def best_card(b, pid):
     st.markdown(f"""<div class='best'>
       <span class='tag'>최우수 매칭 농원</span><br>
@@ -310,9 +319,16 @@ def best_card(b, pid):
       🎁 특별 서비스: 현장 화분 매칭 및 무료 분갈이 가능<br>
       👍 추천 횟수: {b['recs']:,}+ · 재고 {b['qty']}개</span></div>""",
       unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1.4, 1, 1])
-    c1.button("🗺️ 이 농원 방문하기 (길 안내)", use_container_width=True, type="primary",
-              key=f"go_{b['id']}_{pid}")
+    # 카카오맵 길안내: st.button은 링크를 못 열므로 a태그 버튼으로 표시
+    kurl = kakao_map_url(b['name'])
+    st.markdown(f"""
+    <a href="{kurl}" target="_blank" style="
+        display:block; text-align:center; text-decoration:none;
+        background:#FEE500; color:#3A1D1D; font-weight:800; font-size:16px;
+        padding:12px; border-radius:12px; margin:8px 0;">
+        🗺️ 이 농원 방문하기 (카카오맵 길 안내)
+    </a>""", unsafe_allow_html=True)
+    c2, c3 = st.columns(2)
     c2.button("📅 방문 예약하기", use_container_width=True, key=f"rsv_{b['id']}_{pid}")
     c3.button("⭐ 내 리스트 저장", use_container_width=True, key=f"sv_{b['id']}_{pid}")
 
@@ -615,9 +631,12 @@ def show_stock_nurseries(pid, compact=False):
                 f"단지 총 재고 <b>{total}개</b></div>", unsafe_allow_html=True)
     for nid, name, qty, upd in (rows if not compact else rows[:2]):
         fresh = "🟢" if (upd and upd >= "2026") else "🟡"
+        kurl = kakao_map_url(name)
         st.markdown(
             f"<div class='nursery'>🏪 <b>{name}</b> ({nid}) · {zone_of(nid)}"
-            f"<br>재고 <b>{qty}개</b> {fresh} · 📍 지도 · 📞 전화</div>",
+            f"<br>재고 <b>{qty}개</b> {fresh} · "
+            f"<a href='{kurl}' target='_blank' style='color:#1a73e8; "
+            f"text-decoration:none; font-weight:700;'>📍 지도</a> · 📞 전화</div>",
             unsafe_allow_html=True)
     if not compact:
         st.caption("🟢 재고 최근 갱신 · 🟡 갱신 필요(72h 기준)")
