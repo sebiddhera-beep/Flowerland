@@ -351,6 +351,19 @@ def clickable_image(path, key, aspect="351/416", fit="100% 100%"):
     </style>""", unsafe_allow_html=True)
     return st.button("\u200b", key=key, use_container_width=True)
 
+PLANT_ILLUST = {"P001": "1_MON.png",  "P002": "2_SKIN.png", "P003": "3_Cal.png",
+                "P009": "4_SANSE.png", "P036": "5_BOS_GO.png"}
+
+def plant_illust(pid):
+    """식물 일러스트 경로 탐색. assets/plants/{PID}.png 가 있으면 우선 사용
+    → 없으면 TOP5 일러스트 → 그것도 없으면 None(이모지 폴백).
+    새 일러스트는 assets/plants/P004.png 처럼 PID 파일명으로만 올리면 자동 반영."""
+    p = asset(os.path.join("plants", f"{pid}.png"))
+    if p:
+        return p
+    f = PLANT_ILLUST.get(pid)
+    return asset(f) if f else None
+
 @st.cache_data
 def _thumb(path, max_px=480):
     """대용량 일러스트를 카드용으로 축소한 PNG 경로 반환.
@@ -673,16 +686,11 @@ if page == "home":
     st.write("")
     st.markdown("#### 실시간 단지 인기 식물 TOP 5")
     # 고해상도 일러스트 이미지 카드 (PNG 없는 식물은 이모지 카드로 자동 폴백)
-    TOP5_IMG = {"P001": "1_MON.png",    # 1위 몬스테라
-                "P002": "2_SKIN.png",   # 2위 스킨답서스
-                "P003": "3_Cal.png",    # 3위 칼라데아
-                "P009": "4_SANSE.png",  # 4위 산세베리아
-                "P036": "5_BOS_GO.png"} # 5위 보스턴고사리
     cols = st.columns(5)
     for rank, (pid, em, col) in enumerate(zip(
             ["P001", "P002", "P003", "P009", "P036"], "🌿🍃🌱🪴🌿", cols), 1):
         with col:
-            img = asset(TOP5_IMG[pid]) if pid in TOP5_IMG else None
+            img = plant_illust(pid)
             if img:
                 if clickable_image(_thumb(img), f"imgbtn_top_{pid}", "2/3", fit="contain"):
                     ss.plant_pid = pid
@@ -711,6 +719,12 @@ elif page == "plant":
         st.stop()
     name = PLANT_NAMES[pid]
     st.markdown(f"## 🌿 {name}")
+
+    # ⓪ 일러스트 (있는 식물만 — assets/plants/{PID}.png 로 추가 가능)
+    ill = plant_illust(pid)
+    if ill:
+        _c = st.columns([1, 2, 1])[1]
+        _c.image(_thumb(ill, 640), use_container_width=True)
 
     # ① API(제미나이): 식물 유형·소개
     st.markdown("### 식물 소개")
