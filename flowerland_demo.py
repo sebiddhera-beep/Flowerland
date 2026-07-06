@@ -812,13 +812,20 @@ elif page == "plant":
 # ══════════════ 얼굴 & MBTI (3단계) ══════════════
 elif page == "face":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
     step = ss.face_step
+    if step == 1:
+        hc1, hc2 = st.columns([1, 3])
+        with hc1:
+            if st.button("← 홈으로", key=f"home_{page}", use_container_width=True): go("home")
+        with hc2:
+            st.markdown(
+                "<div class='step' style='padding-top:8px'>"
+                "1단계 : 분석할 셀카를 찍어주세요</div>",
+                unsafe_allow_html=True)
+    else:
+        if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
 
     if step == 1:
-        st.markdown("<div class='step'>1단계: 셀카 등록</div>", unsafe_allow_html=True)
-        st.markdown("<div class='big'>분석할 셀카를 찍어주세요</div>", unsafe_allow_html=True)
-        st.caption("(A single, best photo is recommended)")
         ss.mbti = st.selectbox("MBTI (선택)", ["선택 안 함"] + [
             a+b+c+d for a in "EI" for b in "SN" for c in "TF" for d in "JP"])
         t1, t2 = st.tabs(["📷 직접 촬영하기", "🖼️ 갤러리에서 선택"])
@@ -826,7 +833,11 @@ elif page == "face":
         with t2: fil = st.file_uploader("파일", type=["jpg", "jpeg", "png"],
                                         label_visibility="collapsed")
         up = cam or fil
-        st.info("팁: 정면 얼굴이 잘 보이도록 찍으면 더 정확해요!")
+        st.markdown(
+            "<div style='background:#eef6ff; border-radius:8px; padding:7px 10px; "
+            "font-size:12.5px; color:#2b3a4a; white-space:nowrap; overflow:hidden; "
+            "text-overflow:ellipsis;'>💡 팁: 얼굴이 잘 보이도록 찍으면 더 정확해요!</div>",
+            unsafe_allow_html=True)
         if up and st.button("다음", type="primary", use_container_width=True):
             ss.face_img = up.getvalue()
             run_face_analysis()          # ◀ 분석 즉시 실행
