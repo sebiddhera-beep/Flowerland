@@ -51,6 +51,16 @@ st.set_page_config(page_title="Flower Land (플라워랜드)", page_icon="🌱",
 GREEN = "#2E7D32"
 st.markdown(f"""
 <style>
+/* Streamlit 기본 실행표시(우상단 올림픽·자전거 아이콘) 숨김 */
+[data-testid="stStatusWidget"] {{ display:none !important; }}
+/* 사진 화면 중앙 원형 회전 스피너 (시계처럼 빙글빙글) */
+.fl-spin-wrap {{ display:flex; flex-direction:column; align-items:center;
+                 justify-content:center; padding:40px 0; }}
+.fl-spinner {{ width:64px; height:64px; border-radius:50%;
+               border:6px solid #e0eee0; border-top-color:{GREEN};
+               animation:fl-rotate 0.9s linear infinite; }}
+.fl-spin-txt {{ margin-top:14px; color:{GREEN}; font-weight:700; font-size:15px; }}
+@keyframes fl-rotate {{ to {{ transform:rotate(360deg); }} }}
 .block-container {{ max-width: 480px; padding-top: 1.0rem; }}
 h1,h2,h3 {{ color:{GREEN}; }}
 .step {{ color:{GREEN}; font-weight:800; font-size:15px; letter-spacing:.3px; }}
@@ -497,6 +507,42 @@ def face_mesh_overlay(img_bytes):
         d.line([xv, cy-yv, xv, cy+yv], fill=(46, 125, 50, 150), width=1)
     return Image.alpha_composite(im, ov)
 
+def run_face_analysis():
+    """셀카를 분석해 ss.face_res / ss.face_copy 를 채운다.
+    2단계 화면을 없앴으므로, 1단계 '다음' 직후 호출해 바로 3단계 카드로 넘어간다.
+    Gemini on이면 실분석, 아니면 목업. 같은 사진은 캐시로 재호출 방지."""
+    h = img_hash(ss.face_img)
+    if gemini_on() and ss.get("face_ai_h") != h:
+        spot = st.empty()   # 중앙 원형 스피너 표시용 placeholder
+        spot.markdown(
+            "<div class='fl-spin-wrap'><div class='fl-spinner'></div>"
+            "<div class='fl-spin-txt'>🤖 얼굴을 분석하는 중...</div></div>",
+            unsafe_allow_html=True)
+        try:
+            mbti = None if ss.get("mbti", "선택 안 함") == "선택 안 함" else ss.mbti
+            res = gm.analyze_face(api_key, ss.face_img,
+                                  list(PLANT_NAMES.values()), mbti)
+            ss.face_ai, ss.face_ai_h = res, h
+        except Exception as e:
+            st.warning(f"Gemini 호출 실패 — 목업 모드로 대체 ({type(e).__name__})")
+            ss.face_ai = None; ss.face_ai_h = h
+        finally:
+            spot.empty()
+    ai = ss.get("face_ai") if ss.get("face_ai_h") == h else None
+
+    if ai:
+        pid = pid_of(ai.get("plant", ""), FACE_PLANTS[h % len(FACE_PLANTS)])
+        imp = f"{ai.get('impression','온화함')} ({ai.get('impression_en','Gentle')})"
+        vib = f"{ai.get('vibe','따뜻함')} ({ai.get('vibe_en','Warm')})"
+        score = int(ai.get("score", 95))
+        ss.face_copy = ai.get("copy", FACE_COPY.get(pid, "따뜻한 조화"))
+    else:
+        pid = FACE_PLANTS[h % len(FACE_PLANTS)]
+        imp, vib = IMPRESSIONS[h % 6], VIBES[h % 4]
+        score = 91 + h % 9
+        ss.face_copy = FACE_COPY[pid]
+    ss.face_res = (pid, imp, vib, score)
+
 def make_qr(text, size=140):
     if HAS_QR:
         q = qrcode.make(text).resize((size, size))
@@ -773,64 +819,24 @@ elif page == "face":
         st.markdown("<div class='step'>1단계: 셀카 등록</div>", unsafe_allow_html=True)
         st.markdown("<div class='big'>분석할 셀카를 찍어주세요</div>", unsafe_allow_html=True)
         st.caption("(A single, best photo is recommended)")
+        ss.mbti = st.selectbox("MBTI (선택)", ["선택 안 함"] + [
+            a+b+c+d for a in "EI" for b in "SN" for c in "TF" for d in "JP"])
         t1, t2 = st.tabs(["📷 직접 촬영하기", "🖼️ 갤러리에서 선택"])
         with t1: cam = camera_capture("face", front_default=True)  # ◀ 촬영 한글화 + 전·후면 전환
         with t2: fil = st.file_uploader("파일", type=["jpg", "jpeg", "png"],
                                         label_visibility="collapsed")
         up = cam or fil
-        ss.mbti = st.selectbox("MBTI (선택)", ["선택 안 함"] + [
-            a+b+c+d for a in "EI" for b in "SN" for c in "TF" for d in "JP"])
         st.info("팁: 정면 얼굴이 잘 보이도록 찍으면 더 정확해요!")
         if up and st.button("다음", type="primary", use_container_width=True):
-            ss.face_img = up.getvalue(); ss.face_step = 2; st.rerun()
-
-    elif step == 2:
-        h = img_hash(ss.face_img)
-        # ── Gemini 실분석 (캐시: 같은 사진 재호출 방지) ──
-        if gemini_on() and ss.get("face_ai_h") != h:
-            try:
-                with st.spinner("🤖 Gemini가 얼굴을 분석하는 중..."):
-                    mbti = None if ss.mbti == "선택 안 함" else ss.mbti
-                    res = gm.analyze_face(api_key, ss.face_img,
-                                          list(PLANT_NAMES.values()), mbti)
-                ss.face_ai, ss.face_ai_h = res, h
-            except Exception as e:
-                st.warning(f"Gemini 호출 실패 — 목업 모드로 대체 ({type(e).__name__})")
-                ss.face_ai = None; ss.face_ai_h = h
-        ai = ss.get("face_ai") if ss.get("face_ai_h") == h else None
-
-        if ai:
-            pid = pid_of(ai.get("plant", ""), FACE_PLANTS[h % len(FACE_PLANTS)])
-            imp = f"{ai.get('impression','온화함')} ({ai.get('impression_en','Gentle')})"
-            vib = f"{ai.get('vibe','따뜻함')} ({ai.get('vibe_en','Warm')})"
-            score = int(ai.get("score", 95))
-            ss.face_copy = ai.get("copy", FACE_COPY.get(pid, "따뜻한 조화"))
-            reason = ai.get("reason", "")
-        else:
-            pid = FACE_PLANTS[h % len(FACE_PLANTS)]
-            imp, vib = IMPRESSIONS[h % 6], VIBES[h % 4]
-            score = 91 + h % 9
-            ss.face_copy = FACE_COPY[pid]
-            reason = ""
-        ss.face_res = (pid, imp, vib, score)
-        st.markdown("<div class='step'>2단계: 얼굴 분석"
-                    + (" · 🤖 Gemini" if ai else " · 목업") + "</div>",
-                    unsafe_allow_html=True)
-        st.markdown(f"<div class='big'>나와 닮은 반려식물: '{PLANT_NAMES[pid]}'</div>",
-                    unsafe_allow_html=True)
-        st.image(face_mesh_overlay(ss.face_img), use_container_width=True) # ◀ 화면 폭에 꽉 차게 확대
-        c1, c2, c3 = st.columns(3)
-        c1.metric("인상", imp.split(" ")[0], imp.split(" ")[1] if " " in imp else "")
-        c2.metric("분위기", vib.split(" ")[0], vib.split(" ")[1] if " " in vib else "")
-        c3.metric("매핑 점수", f"{score}%")
-        if reason:
-            st.markdown(f"<div class='result'>💬 {reason}</div>", unsafe_allow_html=True)
-        if ss.mbti != "선택 안 함":
-            st.caption(f"MBTI {ss.mbti} 반영됨")
-        if st.button("다음 (유형 카드 만들기)", type="primary", use_container_width=True):
-            ss.face_step = 3; st.rerun()
+            ss.face_img = up.getvalue()
+            run_face_analysis()          # ◀ 분석 즉시 실행
+            ss.face_step = 3             # ◀ 2단계 건너뛰고 바로 3단계 카드 출력
+            st.rerun()
 
     else:
+        if not ss.get("face_res") or not ss.get("face_img"):
+            st.warning("셀카 정보가 없어 처음 단계로 돌아갑니다.")
+            ss.face_step = 1; st.rerun()
         pid, imp, vib, score = ss.face_res
         copy = ss.get("face_copy") or FACE_COPY.get(pid, "따뜻한 조화")
         st.markdown("<div class='step'>3단계: 유형 카드 공유 & 매칭 농원</div>",
