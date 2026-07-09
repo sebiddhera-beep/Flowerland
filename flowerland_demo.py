@@ -581,27 +581,31 @@ def make_qr(text, size=140):
     return im
 
 def share_card(img_bytes, pid, copy_text, score):
-    """공유 카드 PNG 생성 (사진 + 식물 일러스트 + 문구 + QR)"""
-    W, H = 840, 1050
+    """공유 카드 PNG 생성 (사진 + 식물 일러스트 + 문구)"""
+    W, H = 840, 1000
     card = Image.new("RGBA", (W, H), (232, 245, 233, 255))
     d = ImageDraw.Draw(card)
     d.rectangle([0, 0, W, 110], fill=(46, 125, 50, 255))
     d.text((30, 30), "🌱 Flower Land (플라워랜드)", font=find_font(40), fill="white")
+    # 사진 크게: 좌우 각 405px
+    PS = 405
+    x_left, x_right, y_img = 25, 410, 150
     # 셀카(좌) — 중앙 정사각 크롭
     ph = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
     side = min(ph.size)
     ph = ph.crop(((ph.width-side)//2, (ph.height-side)//2,
-                  (ph.width+side)//2, (ph.height+side)//2)).resize((380, 380))
-    card.paste(ph, (35, 150))
-    _pl = plant_image(pid, 380, "blue" if pid == "P416" else None)
-    card.paste(_pl, (425, 150), _pl)
-    f_big, f_mid = find_font(44), find_font(30)
-    d.text((35, 575), f"{USER_NAME} 님 & {PLANT_NAMES[pid]} :", font=f_big, fill=(27, 60, 30))
-    d.text((35, 635), copy_text, font=f_big, fill=(27, 60, 30))
-    d.text((35, 720), f"매핑 점수 {score}%  ·  나와 닮은 반려식물 카드", font=f_mid, fill=(90, 110, 90))
-    qr = make_qr(f"https://flowerland.demo/share/{pid}/{score}", 200)
-    card.paste(qr, (W-240, H-260), qr)
-    d.text((35, H-230), "QR을 스캔하면 나의 식물 유형을\n확인할 수 있어요!", font=f_mid, fill=(90, 110, 90))
+                  (ph.width+side)//2, (ph.height+side)//2)).resize((PS, PS))
+    card.paste(ph, (x_left, y_img))
+    # 식물(우)
+    _pl = plant_image(pid, PS, "blue" if pid == "P416" else None)
+    card.paste(_pl, (x_right, y_img), _pl)
+    # 텍스트 (사진 아래로)
+    ty = y_img + PS + 55
+    f_big, f_mid = find_font(46), find_font(30)
+    d.text((35, ty), f"{USER_NAME} 님 & {PLANT_NAMES[pid]} :", font=f_big, fill=(27, 60, 30))
+    d.text((35, ty + 62), copy_text, font=f_big, fill=(27, 60, 30))
+    d.text((35, ty + 150), f"매핑 점수 {score}%  ·  나와 닮은 반려식물 카드",
+           font=f_mid, fill=(90, 110, 90))
     d.rectangle([0, H-40, W, H], fill=(46, 125, 50, 255))
     return card
 
