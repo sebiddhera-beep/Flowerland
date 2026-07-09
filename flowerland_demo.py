@@ -1029,14 +1029,109 @@ elif page == "space":
                     if st.button("🔄 다시 합성하기", use_container_width=True):
                         ss.comp_key = None; st.rerun()
         else:
-            st.caption("원하는 위치에 식물을 놓아보세요. (슬라이더로 위치·크기 조정)")
-            c1, c2, c3 = st.columns(3)
-            x = c1.slider("좌우 위치", 10, 90, 50)
-            y = c2.slider("상하 위치", 10, 90, 62)
-            sc = c3.slider("크기", 15, 60, 34)
-            st.image(composite_plant(ss.sp_img, pid, x, y, sc,
-                                     f"{PLANT_NAMES[pid]} 대형 화분"),
-                     use_container_width=True)
+            st.caption("👆 식물을 손가락으로 끌어 옮기고, 두 손가락으로 크기를 조절한 뒤 "
+                       "‘이 위치로 확정’을 누르세요. (마우스는 드래그 이동, 휠로 크기)")
+            # 서버가 이전에 확정한 값이 있으면 초기 위치로 사용
+            init_x = ss.get("mx", 50); init_y = ss.get("my", 60); init_s = ss.get("msc", 38)
+            # 배경(공간 사진) + 식물 이미지를 base64로 브라우저에 전달 → 실시간 조작
+            bg_b64 = base64.b64encode(ss.sp_img).decode()
+            ill = plant_illust(pid)
+            if ill:
+                _pi = Image.open(ill).convert("RGBA")
+                _buf = io.BytesIO(); _pi.save(_buf, "PNG")
+                plant_b64 = base64.b64encode(_buf.getvalue()).decode()
+            else:
+                _pl = draw_plant(400, "blue" if pid == "P416" else None)
+                _buf = io.BytesIO(); _pl.save(_buf, "PNG")
+                plant_b64 = base64.b64encode(_buf.getvalue()).decode()
+
+            components.html(f"""
+            <div id="stage" style="position:relative; width:100%; max-width:700px;
+                 margin:0 auto; touch-action:none; user-select:none; border-radius:12px;
+                 overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.15);">
+              <img id="bg" src="data:image/jpeg;base64,{bg_b64}"
+                   style="width:100%; display:block; pointer-events:none;">
+              <img id="plant" src="data:image/png;base64,{plant_b64}"
+                   style="position:absolute; left:{init_x}%; top:{init_y}%; width:{init_s}%;
+                          transform:translate(-50%,-50%); cursor:grab;
+                          filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));">
+              <div style="position:absolute; left:8px; bottom:8px; background:rgba(46,125,50,.85);
+                   color:#fff; font-size:12px; padding:3px 9px; border-radius:8px;">
+                {PLANT_NAMES[pid]} — 끌어서 이동 · 두 손가락/휠로 크기</div>
+            </div>
+            <div style="text-align:center; margin-top:10px;">
+              <button id="confirm" style="background:#2e7d32; color:#fff; border:none;
+                 font-size:16px; font-weight:700; padding:11px 28px; border-radius:10px;
+                 cursor:pointer;">✅ 이 위치로 확정</button>
+              <span id="pos" style="margin-left:10px; color:#666; font-size:13px;"></span>
+            </div>
+            <script>
+            (function(){{
+              const stage=document.getElementById('stage');
+              const plant=document.getElementById('plant');
+              let px={init_x}, py={init_y}, scale={init_s};       // % 단위
+              function apply(){{
+                plant.style.left=px+'%'; plant.style.top=py+'%'; plant.style.width=scale+'%';
+                document.getElementById('pos').textContent =
+                  '좌우 '+Math.round(px)+'% · 상하 '+Math.round(py)+'% · 크기 '+Math.round(scale)+'%';
+              }}
+              function rect(){{ return stage.getBoundingClientRect(); }}
+              let dragging=false, ox=0, oy=0;
+              function startDrag(cx,cy){{ dragging=true; plant.style.cursor='grabbing';
+                const r=rect(); ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
+              function moveDrag(cx,cy){{ if(!dragging)return; const r=rect();
+                px=Math.min(95,Math.max(5,((cx-r.left-ox)/r.width)*100));
+                py=Math.min(95,Math.max(5,((cy-r.top-oy)/r.height)*100)); apply(); }}
+              function endDrag(){{ dragging=false; plant.style.cursor='grab'; }}
+              plant.addEventListener('mousedown',e=>{{startDrag(e.clientX,e.clientY);e.preventDefault();}});
+              window.addEventListener('mousemove',e=>moveDrag(e.clientX,e.clientY));
+              window.addEventListener('mouseup',endDrag);
+              stage.addEventListener('wheel',e=>{{ scale=Math.min(90,Math.max(10,
+                scale - Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
+              let pinchStart=0, scaleStart={init_s};
+              function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+                return Math.hypot(dx,dy); }}
+              stage.addEventListener('touchstart',e=>{{
+                if(e.touches.length===1){{ startDrag(e.touches[0].clientX,e.touches[0].clientY); }}
+                else if(e.touches.length===2){{ dragging=false; pinchStart=dist(e.touches);
+                  scaleStart=scale; }}
+                e.preventDefault();
+              }},{{passive:false}});
+              stage.addEventListener('touchmove',e=>{{
+                if(e.touches.length===1){{ moveDrag(e.touches[0].clientX,e.touches[0].clientY); }}
+                else if(e.touches.length===2 && pinchStart>0){{
+                  scale=Math.min(90,Math.max(10, scaleStart*(dist(e.touches)/pinchStart))); apply(); }}
+                e.preventDefault();
+              }},{{passive:false}});
+              stage.addEventListener('touchend',e=>{{ if(e.touches.length===0){{endDrag();pinchStart=0;}} }});
+              // ── 확정: 부모(Streamlit) URL에 값 실어 새로고침 → 서버가 읽어 합성 ──
+              document.getElementById('confirm').addEventListener('click',function(){{
+                const p = window.parent;
+                const url = new URL(p.location.href);
+                url.searchParams.set('mx', Math.round(px));
+                url.searchParams.set('my', Math.round(py));
+                url.searchParams.set('msc', Math.round(scale));
+                p.location.href = url.toString();
+              }});
+              apply();
+            }})();
+            </script>
+            """, height=590)
+
+            # ── 서버: URL 쿼리파라미터로 넘어온 확정값을 읽어 합성 ──
+            qp = st.query_params
+            if "mx" in qp and "my" in qp and "msc" in qp:
+                try:
+                    ss.mx = int(qp["mx"]); ss.my = int(qp["my"]); ss.msc = int(qp["msc"])
+                except ValueError:
+                    pass
+                st.query_params.clear()   # 값 소비 후 URL 정리(무한루프 방지)
+            if "mx" in ss:
+                st.success(f"확정 위치: 좌우 {ss.mx}% · 상하 {ss.my}% · 크기 {ss.msc}%")
+                ss.comp_img = composite_plant(ss.sp_img, pid, ss.mx, ss.my, ss.msc,
+                                              f"{PLANT_NAMES[pid]} 대형 화분")
+                st.image(ss.comp_img, use_container_width=True,
+                         caption="확정한 위치로 합성된 결과 (저장됩니다)")
         b1, b2, b3 = st.columns(3)
         b1.button("🔄 식물 변경", use_container_width=True,
                   on_click=lambda: ss.update(space_step=2))
