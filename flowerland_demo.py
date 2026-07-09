@@ -269,6 +269,16 @@ DIAG_CLASSES = [
 # ── DB / 농원 ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_conn():
+    # 기존 DB가 있으면 스키마 버전 검사 → 옛 버전이면 삭제 후 재생성
+    if os.path.exists(td.DB_PATH):
+        try:
+            _c = sqlite3.connect(td.DB_PATH)
+            valid = td.db_is_valid(_c)
+            _c.close()
+        except Exception:
+            valid = False
+        if not valid:
+            os.remove(td.DB_PATH)       # 옛 스키마 → 폐기하고 새로 생성
     fresh = not os.path.exists(td.DB_PATH)
     conn = sqlite3.connect(td.DB_PATH, check_same_thread=False)
     td.init_schema(conn)

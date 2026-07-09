@@ -21,6 +21,23 @@ import sqlite3
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dispatch.db")
 _MASTER_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plants_master.csv")
 
+# 스키마 버전: 구조가 바뀌면 이 숫자를 올린다.
+# 앱은 DB의 버전이 이 값과 다르면 DB를 통째로 재생성한다.
+SCHEMA_VERSION = 2
+
+
+def db_is_valid(conn):
+    """현재 DB가 최신 스키마(SCHEMA_VERSION, dispatch_log 존재)인지 확인."""
+    try:
+        tabs = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if not {"nursery", "stock", "dispatch_log"} <= tabs:
+            return False
+        ver = conn.execute("PRAGMA user_version").fetchone()[0]
+        return ver == SCHEMA_VERSION
+    except Exception:
+        return False
+
 # ── 농원 생성 파라미터 ──────────────────────────────────────────
 N_NURSERY = 80                      # 불로화훼단지 농원 수(데모)
 ZONES = ["A동", "B동", "C동", "D동", "E동", "노지구역"]
@@ -62,6 +79,7 @@ def init_schema(conn):
     );
     CREATE INDEX IF NOT EXISTS idx_stock_plant ON stock(plant_id);
     """)
+    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     conn.commit()
 
 
