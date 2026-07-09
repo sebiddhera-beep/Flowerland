@@ -393,10 +393,11 @@ PLANT_ILLUST = {"P001": "1_MON.png",  "P002": "2_SKIN.png", "P003": "3_Cal.png",
 def plant_illust(pid):
     """식물 일러스트 경로 탐색. assets/plants/{PID}.png 가 있으면 우선 사용
     → 없으면 TOP5 일러스트 → 그것도 없으면 None(이모지 폴백).
-    새 일러스트는 assets/plants/P004.png 처럼 PID 파일명으로만 올리면 자동 반영."""
-    p = asset(os.path.join("plants", f"{pid}.png"))
-    if p:
-        return p
+    새 일러스트는 assets/plants/P004.png(또는 .webp) 파일명으로만 올리면 자동 반영."""
+    for ext in ("png", "webp"):
+        p = asset(os.path.join("plants", f"{pid}.{ext}"))
+        if p:
+            return p
     f = PLANT_ILLUST.get(pid)
     return asset(f) if f else None
 
@@ -462,6 +463,23 @@ def find_font(size):
             except Exception:
                 pass
     return ImageFont.load_default()
+
+def plant_image(pid, size=380, flower=None):
+    """식물 그림을 size×size RGBA 로 반환.
+    assets/plants/{PID}.png(webp) 실제 일러스트가 있으면 그것을 정사각으로 맞춰 사용,
+    없으면 draw_plant() 도형으로 폴백. share_card / composite_plant 공용."""
+    ill = plant_illust(pid)
+    if ill:
+        try:
+            im = Image.open(ill).convert("RGBA")
+            # 정사각 중앙 크롭 후 리사이즈
+            side = min(im.size)
+            im = im.crop(((im.width - side) // 2, (im.height - side) // 2,
+                          (im.width + side) // 2, (im.height + side) // 2))
+            return im.resize((size, size), Image.LANCZOS)
+        except Exception:
+            pass
+    return draw_plant(size, flower)
 
 def draw_plant(size=300, flower=None):
     """화분+식물 일러스트 (flower='blue'면 수국 스타일)"""
@@ -575,8 +593,8 @@ def share_card(img_bytes, pid, copy_text, score):
     ph = ph.crop(((ph.width-side)//2, (ph.height-side)//2,
                   (ph.width+side)//2, (ph.height+side)//2)).resize((380, 380))
     card.paste(ph, (35, 150))
-    card.paste(draw_plant(380, "blue" if pid == "P416" else None), (425, 150), 
-               draw_plant(380, "blue" if pid == "P416" else None))
+    _pl = plant_image(pid, 380, "blue" if pid == "P416" else None)
+    card.paste(_pl, (425, 150), _pl)
     f_big, f_mid = find_font(44), find_font(30)
     d.text((35, 575), f"{USER_NAME} 님 & {PLANT_NAMES[pid]} :", font=f_big, fill=(27, 60, 30))
     d.text((35, 635), copy_text, font=f_big, fill=(27, 60, 30))
@@ -593,7 +611,7 @@ def composite_plant(bg_bytes, pid, x_pct, y_pct, scale_pct, label):
     bg.thumbnail((720, 720))
     w, h = bg.size
     ps = int(min(w, h) * scale_pct / 100)
-    pl = draw_plant(ps, "blue" if pid == "P416" else None)
+    pl = plant_image(pid, ps, "blue" if pid == "P416" else None)
     x = int(w * x_pct / 100 - ps/2)
     y = int(h * y_pct / 100 - ps/2)
     out = bg.copy()
@@ -1011,7 +1029,7 @@ elif page == "space":
         if ss.get("comp_img"):
             pc1.image(ss.comp_img)
         else:
-            pc1.image(draw_plant(220, "blue" if pid == "P416" else None))
+            pc1.image(plant_image(pid, 220, "blue" if pid == "P416" else None))
         reason = ss.get("sp_reason") or PLANT_DESC.get(
             pid, "이 공간의 채광·규모에 최적화된 추천 식물")
         pc2.markdown(f"""<div class='result'><b style='font-size:20px'>{PLANT_NAMES[pid]}</b><br>
