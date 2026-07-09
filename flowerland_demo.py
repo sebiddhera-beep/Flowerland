@@ -474,6 +474,24 @@ def find_font(size):
                 pass
     return ImageFont.load_default()
 
+@st.cache_data
+def _white_to_transparent(path, thr=238):
+    """흰 배경 이미지의 밝은 픽셀을 투명 처리하여 RGBA 반환.
+    합성 시 흰 사각형 배경이 방 사진 위에 얹히는 문제 해결.
+    thr(0~255) 이상으로 밝고 채도 낮은 픽셀을 배경으로 판정."""
+    im = Image.open(path).convert("RGBA")
+    try:
+        import numpy as np
+        arr = np.array(im)
+        r, g, b = arr[:, :, 0].astype(int), arr[:, :, 1].astype(int), arr[:, :, 2].astype(int)
+        # 밝고(3채널 모두 높음) 채도 낮은(색 차이 작음) 픽셀 = 흰 배경
+        bright = (r > thr) & (g > thr) & (b > thr)
+        low_sat = (arr[:, :, :3].max(axis=2) - arr[:, :, :3].min(axis=2)) < 18
+        arr[bright & low_sat, 3] = 0
+        return Image.fromarray(arr, "RGBA")
+    except Exception:
+        return im
+
 def plant_image(pid, size=380, flower=None):
     """식물 그림을 size×size RGBA 로 반환.
     assets/plants/{PID}.png(webp) 실제 일러스트가 있으면 그것을 정사각으로 맞춰 사용,
@@ -481,7 +499,7 @@ def plant_image(pid, size=380, flower=None):
     ill = plant_illust(pid)
     if ill:
         try:
-            im = Image.open(ill).convert("RGBA")
+            im = _white_to_transparent(ill)   # 흰 배경 투명 처리
             # 정사각 중앙 크롭 후 리사이즈
             side = min(im.size)
             im = im.crop(((im.width - side) // 2, (im.height - side) // 2,
@@ -1037,7 +1055,7 @@ elif page == "space":
             bg_b64 = base64.b64encode(ss.sp_img).decode()
             ill = plant_illust(pid)
             if ill:
-                _pi = Image.open(ill).convert("RGBA")
+                _pi = _white_to_transparent(ill)   # 흰 배경 투명 처리
                 _buf = io.BytesIO(); _pi.save(_buf, "PNG")
                 plant_b64 = base64.b64encode(_buf.getvalue()).decode()
             else:
