@@ -211,20 +211,25 @@ def gemini_on():
 NAME_TO_PID = {}  # PLANT_NAMES 정의 후 아래에서 채움
 
 # ── 데이터 ───────────────────────────────────────────────────────────────────
-# 식물 마스터 60종 (dispatch.db의 P001~P060과 1:1 매핑 — 검색 대상)
-_NAMES = [
-    "몬스테라", "스킨답서스", "칼라데아", "여인초", "스투키", "금전수", "홍콩야자",
-    "테이블야자", "산세베리아", "아레카야자", "고무나무", "올리브나무", "유칼립투스",
-    "라벤더", "로즈마리", "다육 에케베리아", "필로덴드론", "알로카시아", "행운목",
-    "수국", "남천나무", "에메랄드그린", "관음죽", "파키라", "벵갈고무나무",
-    "떡갈잎고무나무", "몬스테라 아단소니", "안스리움", "스파티필름", "디펜바키아",
-    "아글라오네마", "호야", "립살리스", "틸란드시아", "박쥐란", "보스턴고사리",
-    "아디안텀", "페페로미아", "필레아", "칼랑코에", "제라늄", "베고니아",
-    "시클라멘", "포인세티아", "호접란", "덴파레", "심비디움", "동양란",
-    "풍란", "석곡", "장미", "국화", "카네이션", "거베라", "튤립 구근",
-    "수선화 구근", "무늬산세베리아", "황금죽", "커피나무", "레몬나무",
-]
-PLANT_NAMES = {f"P{i:03d}": n for i, n in enumerate(_NAMES, 1)}
+# 식물 마스터 1001종: plants_master.csv (PID·한글명·영문명·학명) 을 로드.
+# dispatch.db 는 이 PID 체계로 traffic_dispatch.seed() 가 재고를 생성한다.
+import csv as _csv
+
+_MASTER = []                 # [{pid,korean,english_common,scientific,category}, ...]
+_MASTER_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plants_master.csv")
+try:
+    with open(_MASTER_CSV, encoding="utf-8") as _f:
+        for _r in _csv.DictReader(_f):
+            _MASTER.append(_r)
+except FileNotFoundError:
+    # CSV가 없을 때의 최소 폴백(앱이 죽지 않게)
+    _MASTER = [{"pid": "P001", "korean": "몬스테라", "english_common": "Monstera",
+                "scientific": "Monstera deliciosa", "category": "관엽 Foliage"}]
+
+PLANT_NAMES = {r["pid"]: r["korean"]         for r in _MASTER}
+PLANT_EN    = {r["pid"]: r["english_common"] for r in _MASTER}
+PLANT_SCI   = {r["pid"]: r["scientific"]     for r in _MASTER}
+PLANT_CAT   = {r["pid"]: r["category"]       for r in _MASTER}
 NAME_TO_PID.update({n: p for p, n in PLANT_NAMES.items()})
 
 def pid_of(name, fallback):
@@ -236,22 +241,22 @@ def pid_of(name, fallback):
             return p
     return fallback
 PLANT_DESC = {
-    "P020": "사계절 노지 월동이 가능하며, 여름철 화려한 군락을 형성하는 야외 특화 식물",
+    "P416": "사계절 노지 월동이 가능하며, 여름철 화려한 군락을 형성하는 야외 특화 식물",
     "P004": "시원하게 뻗는 큰 잎으로 거실의 무드를 살리는 대형 관엽 식물",
     "P001": "구멍 뚫린 잎이 매력적인 국민 관엽. 밝은 간접광에서 잘 자람",
 }
 IMPRESSIONS = ["대범함 (Bold)", "세련됨 (Sophisticated)", "온화함 (Gentle)",
                "명랑함 (Cheerful)", "차분함 (Calm)", "당당함 (Confident)"]
 VIBES = ["따뜻함 (Warm)", "산뜻함 (Fresh)", "포근함 (Cozy)", "싱그러움 (Vivid)"]
-FACE_PLANTS = ["P004", "P001", "P012", "P010", "P013", "P020", "P003", "P006"]
+FACE_PLANTS = ["P004", "P001", "P010", "P227", "P011", "P416", "P003", "P006"]
 FACE_COPY = {"P004": "대범하고 따뜻한 시선", "P001": "세련되고 따뜻한 조화",
-             "P012": "클래식하고 차분한 품격", "P010": "다정하고 싱그러운 배려",
-             "P013": "자유롭고 산뜻한 감성", "P020": "화려하고 당당한 존재감",
+             "P010": "클래식하고 차분한 품격", "P227": "다정하고 싱그러운 배려",
+             "P011": "자유롭고 산뜻한 감성", "P416": "화려하고 당당한 존재감",
              "P003": "섬세하고 포근한 감수성", "P006": "실속 있고 온화한 든든함"}
-INDOOR_RECS  = {"거실": ["P001", "P004", "P010"], "침실": ["P009", "P002", "P005"],
-                "사무실": ["P006", "P002", "P009"]}
-OUTDOOR_RECS = {"베란다": ["P012", "P015", "P016"], "정원": ["P020", "P021", "P022"],
-                "테라스": ["P020", "P013", "P022"]}
+INDOOR_RECS  = {"거실": ["P001", "P004", "P227"], "침실": ["P008", "P002", "P005"],
+                "사무실": ["P006", "P002", "P008"]}
+OUTDOOR_RECS = {"베란다": ["P010", "P365", "P241"], "정원": ["P416", "P591", "P752"],
+                "테라스": ["P416", "P011", "P752"]}
 DIAG_CLASSES = [
     ("과습", "물주기를 절반으로 줄이고 배수 구멍 확인. 겉흙 3cm 마른 뒤 관수"),
     ("건조", "즉시 저면관수 30분. 이후 주 1~2회 규칙 관수로 전환"),
@@ -383,7 +388,7 @@ def clickable_image(path, key, aspect="351/416", fit="100% 100%"):
     return st.button("\u200b", key=key, use_container_width=True)
 
 PLANT_ILLUST = {"P001": "1_MON.png",  "P002": "2_SKIN.png", "P003": "3_Cal.png",
-                "P009": "4_SANSE.png", "P036": "5_BOS_GO.png"}
+                "P008": "4_SANSE.png", "P026": "5_BOS_GO.png"}
 
 def plant_illust(pid):
     """식물 일러스트 경로 탐색. assets/plants/{PID}.png 가 있으면 우선 사용
@@ -570,8 +575,8 @@ def share_card(img_bytes, pid, copy_text, score):
     ph = ph.crop(((ph.width-side)//2, (ph.height-side)//2,
                   (ph.width+side)//2, (ph.height+side)//2)).resize((380, 380))
     card.paste(ph, (35, 150))
-    card.paste(draw_plant(380, "blue" if pid == "P020" else None), (425, 150), 
-               draw_plant(380, "blue" if pid == "P020" else None))
+    card.paste(draw_plant(380, "blue" if pid == "P416" else None), (425, 150), 
+               draw_plant(380, "blue" if pid == "P416" else None))
     f_big, f_mid = find_font(44), find_font(30)
     d.text((35, 575), f"{USER_NAME} 님 & {PLANT_NAMES[pid]} :", font=f_big, fill=(27, 60, 30))
     d.text((35, 635), copy_text, font=f_big, fill=(27, 60, 30))
@@ -588,7 +593,7 @@ def composite_plant(bg_bytes, pid, x_pct, y_pct, scale_pct, label):
     bg.thumbnail((720, 720))
     w, h = bg.size
     ps = int(min(w, h) * scale_pct / 100)
-    pl = draw_plant(ps, "blue" if pid == "P020" else None)
+    pl = draw_plant(ps, "blue" if pid == "P416" else None)
     x = int(w * x_pct / 100 - ps/2)
     y = int(h * y_pct / 100 - ps/2)
     out = bg.copy()
@@ -758,7 +763,7 @@ if page == "home":
     # 고해상도 일러스트 이미지 카드 (PNG 없는 식물은 이모지 카드로 자동 폴백)
     cols = st.columns(5)
     for rank, (pid, em, col) in enumerate(zip(
-            ["P001", "P002", "P003", "P009", "P036"], "🌿🍃🌱🪴🌿", cols), 1):
+            ["P001", "P002", "P003", "P008", "P026"], "🌿🍃🌱🪴🌿", cols), 1):
         with col:
             img = plant_illust(pid)
             if img:
@@ -1006,7 +1011,7 @@ elif page == "space":
         if ss.get("comp_img"):
             pc1.image(ss.comp_img)
         else:
-            pc1.image(draw_plant(220, "blue" if pid == "P020" else None))
+            pc1.image(draw_plant(220, "blue" if pid == "P416" else None))
         reason = ss.get("sp_reason") or PLANT_DESC.get(
             pid, "이 공간의 채광·규모에 최적화된 추천 식물")
         pc2.markdown(f"""<div class='result'><b style='font-size:20px'>{PLANT_NAMES[pid]}</b><br>
@@ -1268,10 +1273,10 @@ elif page == "diag":
                     + (f"<br>추정 식물: {guess}" if guess else "")
                     + f"<br><br><b>💊 처방</b><br>{rx}</div>", unsafe_allow_html=True)
         if need_repot:
-            nb = best_nursery("P016", "fun03")
+            nb = best_nursery("P241", "fun03")
             if nb:
                 st.info("🪴 분갈이·화분 특화 농원과 연결해 드립니다.")
-                best_card(nb, "P016")
+                best_card(nb, "P241")
         if conf < 70:
             st.warning("신뢰도가 낮습니다. 단지 내 전문가 상담을 권장합니다.")
         st.caption("※ 본 진단은 참고용이며 실제 상태와 다를 수 있습니다.")
@@ -1314,7 +1319,7 @@ elif page == "care":
             {"name": "거실 몬스테라", "pid": "P001", "water_cycle": 7,  "feed_cycle": 30,
              "last_water": date.today() - timedelta(days=6),
              "last_feed":  date.today() - timedelta(days=25)},
-            {"name": "베란다 다육이", "pid": "P016", "water_cycle": 14, "feed_cycle": 45,
+            {"name": "베란다 다육이", "pid": "P241", "water_cycle": 14, "feed_cycle": 45,
              "last_water": date.today() - timedelta(days=3),
              "last_feed":  date.today() - timedelta(days=10)},
         ]
@@ -1361,7 +1366,7 @@ elif page == "care":
 
     # 물/영양 관련 자재 → 단지 농원 연결 (트래픽 분배)
     st.markdown("#### 🏪 영양제·급수 용품이 필요하면")
-    b = best_nursery("P016", "care") if 'best_nursery' in dir() else None
-    pairs = pick_nurseries("P016", 2, "care")
-    show_nurseries(pairs, "P016")
+    b = best_nursery("P241", "care") if 'best_nursery' in dir() else None
+    pairs = pick_nurseries("P241", 2, "care")
+    show_nurseries(pairs, "P241")
 
