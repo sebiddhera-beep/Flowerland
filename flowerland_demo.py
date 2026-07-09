@@ -955,10 +955,13 @@ elif page == "space":
                       f"{c.get('value','')}|/|{c.get('detail','')}".replace("|/|", "<br>"))
                      for i, c in enumerate(ai["cards"][:4])]
             stars = int(ai.get("stars", 4))
-            recs = [pid_of(n, r) for n, r in zip(
-                ai.get("plants", []),
-                (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room])] or \
-                (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
+            _fallback = (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
+            recs = [pid_of(n, fb) for n, fb in zip(ai.get("plants", []), _fallback)]
+            # 유효하지 않은 PID(마스터에 없음)는 기본 추천으로 교체
+            recs = [(p if p in PLANT_NAMES else fb)
+                    for p, fb in zip(recs + _fallback, _fallback)][:3]
+            if not recs:
+                recs = _fallback
             ss.sp_match = int(ai.get("match", 97))
             ss.sp_reason = ai.get("reason", "")
         else:
@@ -986,8 +989,15 @@ elif page == "space":
         st.markdown("#### 추천 식물들")
         cols = st.columns(3)
         for col, pid in zip(cols, recs):
-            col.markdown(f"<div class='top5'><div style='font-size:34px'>🌿</div>"
-                         f"<b>{PLANT_NAMES[pid]}</b> 👍</div>", unsafe_allow_html=True)
+            ill = plant_illust(pid)
+            if ill:
+                col.image(_thumb(ill, 240), use_container_width=True)
+                col.markdown(f"<div style='text-align:center'><b>{PLANT_NAMES[pid]}</b> 👍</div>",
+                             unsafe_allow_html=True)
+            else:
+                col.markdown(f"<div class='top5'><div style='font-size:34px'>🌿</div>"
+                             f"<b>{PLANT_NAMES[pid]}</b> 👍</div>", unsafe_allow_html=True)
+        ss.sp_recs = recs      # 4단계에서 3종 추천 재사용
         ss.sp_pid = st.radio("가상 배치할 식물 선택",
                              recs, format_func=lambda p: PLANT_NAMES[p], horizontal=True)
         if st.button("다음", type="primary", use_container_width=True):
@@ -1052,6 +1062,22 @@ elif page == "space":
             pid, "이 공간의 채광·규모에 최적화된 추천 식물")
         pc2.markdown(f"""<div class='result'><b style='font-size:20px'>{PLANT_NAMES[pid]}</b><br>
             {reason}<br>단지 평균가 / 건강 장수 수명 ⭐ 4.9</div>""", unsafe_allow_html=True)
+
+        # ── 사진 바로 아래: 이 공간에 어울리는 3가지 추천 식물 ──
+        recs = ss.get("sp_recs") or [pid]
+        st.markdown("#### 🌿 이 공간에 어울리는 추천 식물 3가지")
+        rcols = st.columns(3)
+        for col, rp in zip(rcols, recs[:3]):
+            ill = plant_illust(rp)
+            if ill:
+                col.image(_thumb(ill, 240), use_container_width=True)
+            else:
+                col.markdown("<div style='text-align:center;font-size:48px'>🌿</div>",
+                             unsafe_allow_html=True)
+            _mark = " ✅" if rp == pid else ""
+            col.markdown(f"<div style='text-align:center'><b>{PLANT_NAMES[rp]}</b>{_mark}</div>",
+                         unsafe_allow_html=True)
+
         st.markdown("#### 이 식물을 가장 잘 키우고 조경 자재를 보유한 농원")
         b = best_nursery(pid, "fun02")
         if b: best_card(b, pid)
