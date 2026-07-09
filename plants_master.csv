@@ -1,0 +1,1002 @@
+pid,category,korean,english_common,scientific
+P001,관엽 Foliage,몬스테라,Monstera,Monstera deliciosa
+P002,관엽 Foliage,스킨답서스,Golden Pothos,Epipremnum aureum
+P003,관엽 Foliage,칼라데아,Calathea,Goeppertia makoyana
+P004,관엽 Foliage,여인초,White Bird of Paradise,Strelitzia nicolai
+P005,관엽 Foliage,스투키,Cylindrical Snake Plant,Dracaena angolensis
+P006,관엽 Foliage,금전수,ZZ Plant,Zamioculcas zamiifolia
+P007,관엽 Foliage,홍콩야자,Dwarf Umbrella Tree,Schefflera arboricola
+P008,관엽 Foliage,산세베리아,Snake Plant,Dracaena trifasciata
+P009,관엽 Foliage,고무나무,Rubber Plant,Ficus elastica
+P010,관엽 Foliage,올리브나무,Olive Tree,Olea europaea
+P011,관엽 Foliage,유칼립투스,Eucalyptus,Eucalyptus gunnii
+P012,관엽 Foliage,필로덴드론,Heartleaf Philodendron,Philodendron hederaceum
+P013,관엽 Foliage,알로카시아,Elephant Ear,Alocasia amazonica
+P014,관엽 Foliage,행운목,Corn Plant,Dracaena fragrans
+P015,관엽 Foliage,파키라,Money Tree,Pachira aquatica
+P016,관엽 Foliage,벵갈고무나무,Bengal Fig,Ficus benghalensis
+P017,관엽 Foliage,떡갈잎고무나무,Fiddle Leaf Fig,Ficus lyrata
+P018,관엽 Foliage,몬스테라 아단소니,Swiss Cheese Vine,Monstera adansonii
+P019,관엽 Foliage,안스리움,Anthurium,Anthurium andraeanum
+P020,관엽 Foliage,스파티필름,Peace Lily,Spathiphyllum wallisii
+P021,관엽 Foliage,디펜바키아,Dumb Cane,Dieffenbachia seguine
+P022,관엽 Foliage,아글라오네마,Chinese Evergreen,Aglaonema commutatum
+P023,관엽 Foliage,호야,Hoya Wax Plant,Hoya carnosa
+P024,관엽 Foliage,틸란드시아,Air Plant,Tillandsia ionantha
+P025,관엽 Foliage,박쥐란,Staghorn Fern,Platycerium bifurcatum
+P026,관엽 Foliage,보스턴고사리,Boston Fern,Nephrolepis exaltata
+P027,관엽 Foliage,아디안텀,Maidenhair Fern,Adiantum raddianum
+P028,관엽 Foliage,페페로미아,Peperomia,Peperomia obtusifolia
+P029,관엽 Foliage,필레아,Chinese Money Plant,Pilea peperomioides
+P030,관엽 Foliage,무늬산세베리아,Snake Plant,Dracaena trifasciata
+P031,관엽 Foliage,벤자민고무나무,Weeping Fig,Ficus benjamina
+P032,관엽 Foliage,대만고무나무,Ginseng Ficus,Ficus microcarpa
+P033,관엽 Foliage,극락조,Bird of Paradise,Strelitzia reginae
+P034,관엽 Foliage,셀렘,Tree Philodendron,Thaumatophyllum bipinnatifidum
+P035,관엽 Foliage,마란타,Prayer Plant,Maranta leuconeura
+P036,관엽 Foliage,드라세나마지나타,Dragon Tree,Dracaena marginata
+P037,관엽 Foliage,개운죽,Lucky Bamboo,Dracaena sanderiana
+P038,관엽 Foliage,크로톤,Croton,Codiaeum variegatum
+P039,관엽 Foliage,아이비,English Ivy,Hedera helix
+P040,관엽 Foliage,싱고니움,Arrowhead Plant,Syngonium podophyllum
+P041,관엽 Foliage,아스플레니움,Bird's Nest Fern,Asplenium nidus
+P042,관엽 Foliage,몬스테라 오블리쿠아,Monstera Obliqua,Monstera obliqua
+P043,관엽 Foliage,필로덴드론 셀로움,Philodendron Selloum,Philodendron bipinnatifidum
+P044,관엽 Foliage,필로덴드론 콩고,Philodendron Congo,Philodendron tatei
+P045,관엽 Foliage,필로덴드론 핑크프린세스,Pink Princess Philodendron,Philodendron erubescens
+P046,관엽 Foliage,필로덴드론 버킨,Philodendron Birkin,Philodendron Birkin
+P047,관엽 Foliage,필로덴드론 브라질,Philodendron Brasil,Philodendron hederaceum Brasil
+P048,관엽 Foliage,안스리움 클라리네르비움,Velvet Anthurium,Anthurium clarinervium
+P049,관엽 Foliage,안스리움 크리스탈리넘,Crystal Anthurium,Anthurium crystallinum
+P050,관엽 Foliage,알로카시아 폴리,Alocasia Polly,Alocasia amazonica Polly
+P051,관엽 Foliage,알로카시아 블랙벨벳,Black Velvet Alocasia,Alocasia reginula
+P052,관엽 Foliage,알로카시아 스티나리아나,Alocasia Stingray,Alocasia macrorrhiza Stingray
+P053,관엽 Foliage,알로카시아 프라이덱,Alocasia Frydek,Alocasia micholitziana
+P054,관엽 Foliage,칼라데아 오르비폴리아,Calathea Orbifolia,Goeppertia orbifolia
+P055,관엽 Foliage,칼라데아 메두사,Calathea Rattlesnake,Goeppertia lancifolia
+P056,관엽 Foliage,칼라데아 화이트스타,Calathea White Star,Goeppertia majestica
+P057,관엽 Foliage,칼라데아 제브리나,Zebra Plant,Goeppertia zebrina
+P058,관엽 Foliage,스트로만테,Stromanthe Triostar,Stromanthe sanguinea
+P059,관엽 Foliage,크테난테,Ctenanthe,Ctenanthe burle-marxii
+P060,관엽 Foliage,베고니아 마쿨라타,Polka Dot Begonia,Begonia maculata
+P061,관엽 Foliage,베고니아 렉스,Rex Begonia,Begonia rex
+P062,관엽 Foliage,피토니아,Nerve Plant,Fittonia albivenis
+P063,관엽 Foliage,히포에스테스,Polka Dot Plant,Hypoestes phyllostachya
+P064,관엽 Foliage,콜레우스,Coleus,Coleus scutellarioides
+P065,관엽 Foliage,트라데스칸티아,Wandering Jew,Tradescantia zebrina
+P066,관엽 Foliage,트라데스칸티아 누아넨시스,Tradescantia Nanouk,Tradescantia Nanouk
+P067,관엽 Foliage,클로로피텀,Spider Plant,Chlorophytum comosum
+P068,관엽 Foliage,아스파라거스,Foxtail Fern,Asparagus densiflorus
+P069,관엽 Foliage,아스파라거스 세타세우스,Lace Fern,Asparagus setaceus
+P070,관엽 Foliage,프테리스,Table Fern,Pteris cretica
+P071,관엽 Foliage,블레크넘,Silver Lady Fern,Blechnum gibbum
+P072,관엽 Foliage,다발리아,Rabbit's Foot Fern,Davallia fejeensis
+P073,관엽 Foliage,셀라기넬라,Spikemoss,Selaginella kraussiana
+P074,관엽 Foliage,넉줄고사리,Squirrel's Foot Fern,Davallia mariesii
+P075,관엽 Foliage,콩고무나무,Rubber Tree Robusta,Ficus elastica Robusta
+P076,관엽 Foliage,움베르타고무나무,Ficus Umbellata,Ficus umbellata
+P077,관엽 Foliage,알로카시아 오도라,Giant Elephant Ear,Alocasia odora
+P078,관엽 Foliage,크로톤 페트라,Croton Petra,Codiaeum variegatum Petra
+P079,관엽 Foliage,디시디아,Dischidia,Dischidia nummularia
+P080,관엽 Foliage,호야 케리,Sweetheart Hoya,Hoya kerrii
+P081,관엽 Foliage,립살리스 카슈테로,Coral Cactus,Rhipsalis cashero
+P082,관엽 Foliage,디펜바키아 카밀라,Dieffenbachia Camille,Dieffenbachia Camille
+P083,관엽 Foliage,아글라오네마 실버퀸,Aglaonema Silver Queen,Aglaonema Silver Queen
+P084,관엽 Foliage,아글라오네마 레드,Red Aglaonema,Aglaonema Siam Aurora
+P085,관엽 Foliage,싱고니움 핑크,Pink Syngonium,Syngonium podophyllum Pink
+P086,관엽 Foliage,에피프레넘 피나텀,Cebu Blue Pothos,Epipremnum pinnatum
+P087,관엽 Foliage,마블퀸 스킨답서스,Marble Queen Pothos,Epipremnum aureum Marble Queen
+P088,관엽 Foliage,네온 스킨답서스,Neon Pothos,Epipremnum aureum Neon
+P089,관엽 Foliage,라피도포라,Mini Monstera,Rhaphidophora tetrasperma
+P090,관엽 Foliage,아스플레니움 크리스피,Crispy Wave Fern,Asplenium nidus Crispy Wave
+P091,관엽 Foliage,립살리스 필로카르파,Old Man Cactus Vine,Rhipsalis pilocarpa
+P092,관엽 Foliage,푸미라,Creeping Fig Variegata,Ficus pumila Variegata
+P093,관엽 Foliage,아이비 제라늄,Ivy Geranium,Pelargonium peltatum
+P094,관엽 Foliage,제라늄 로즈,Rose Geranium,Pelargonium graveolens
+P095,관엽 Foliage,콜레우스 웨일,Coleus Wizard,Coleus scutellarioides Wizard
+P096,관엽 Foliage,아프리칸바이올렛,African Violet,Saintpaulia ionantha
+P097,관엽 Foliage,글록시니아,Gloxinia,Sinningia speciosa
+P098,관엽 Foliage,립스틱플랜트,Lipstick Plant,Aeschynanthus radicans
+P099,관엽 Foliage,칼럼네아,Goldfish Plant,Columnea gloriosa
+P100,관엽 Foliage,에피스시아,Flame Violet,Episcia cupreata
+P101,관엽 Foliage,스트렙토카르푸스,Cape Primrose,Streptocarpus hybridus
+P102,관엽 Foliage,클리비아,Bush Lily,Clivia miniata
+P103,관엽 Foliage,군자란,Kaffir Lily,Clivia nobilis
+P104,관엽 Foliage,아마릴리스 벨라돈나,Belladonna Lily,Amaryllis belladonna
+P105,관엽 Foliage,백량금,Coral Berry,Ardisia crenata
+P106,관엽 Foliage,자금우,Marlberry,Ardisia japonica
+P107,관엽 Foliage,행운목 마상게아나,Mass Cane,Dracaena fragrans Massangeana
+P108,관엽 Foliage,드라세나 와네키,Dracaena Warneckii,Dracaena deremensis Warneckii
+P109,관엽 Foliage,드라세나 콤팩타,Dracaena Compacta,Dracaena fragrans Compacta
+P110,관엽 Foliage,코르딜리네,Ti Plant,Cordyline fruticosa
+P111,관엽 Foliage,유카,Yucca Cane,Yucca elephantipes
+P112,관엽 Foliage,아스피디스트라,Cast Iron Plant,Aspidistra elatior
+P113,관엽 Foliage,마오리소포라,Kowhai,Sophora prostrata
+P114,관엽 Foliage,벤자민 스타라이트,Ficus Starlight,Ficus benjamina Starlight
+P115,관엽 Foliage,만손고사리,Silver Fern,Pityrogramma calomelanos
+P116,관엽 Foliage,틸란드시아 우스네오이데스,Spanish Moss,Tillandsia usneoides
+P117,관엽 Foliage,몬스테라 알보,Monstera Albo,Monstera deliciosa Albo
+P118,관엽 Foliage,몬스테라 타이컨스텔레이션,Thai Constellation,Monstera deliciosa Thai
+P119,관엽 Foliage,몬스테라 두비아,Shingle Plant,Monstera dubia
+P120,관엽 Foliage,몬스테라 실테페카나,Silver Monstera,Monstera siltepecana
+P121,관엽 Foliage,필로덴드론 글로리오섬,Philodendron Gloriosum,Philodendron gloriosum
+P122,관엽 Foliage,필로덴드론 마이카,Philodendron Micans,Philodendron hederaceum Micans
+P123,관엽 Foliage,필로덴드론 플로리다,Philodendron Florida,Philodendron Florida Ghost
+P124,관엽 Foliage,필로덴드론 임페리얼레드,Imperial Red,Philodendron Imperial Red
+P125,관엽 Foliage,필로덴드론 문라이트,Philodendron Moonlight,Philodendron Moonlight
+P126,관엽 Foliage,안스리움 워로퀘아넘,Anthurium Warocqueanum,Anthurium warocqueanum
+P127,관엽 Foliage,안스리움 매그니피컴,Anthurium Magnificum,Anthurium magnificum
+P128,관엽 Foliage,알로카시아 드래곤스케일,Dragon Scale,Alocasia baginda Dragon Scale
+P129,관엽 Foliage,알로카시아 실버드래곤,Silver Dragon,Alocasia baginda Silver Dragon
+P130,관엽 Foliage,알로카시아 쿠쿨라타,Hooded Dwarf Elephant Ear,Alocasia cucullata
+P131,관엽 Foliage,알로카시아 제브리나,Alocasia Zebrina,Alocasia zebrina
+P132,관엽 Foliage,칼라데아 뮤사이카,Network Calathea,Goeppertia musaica
+P133,관엽 Foliage,칼라데아 오나타,Pinstripe Calathea,Goeppertia ornata
+P134,관엽 Foliage,칼라데아 크로카타,Eternal Flame,Goeppertia crocata
+P135,관엽 Foliage,칼라데아 워보스키,Fishbone Prayer Plant,Goeppertia warszewiczii
+P136,관엽 Foliage,마란타 레드,Red Prayer Plant,Maranta leuconeura erythroneura
+P137,관엽 Foliage,싱고니움 알보,Syngonium Albo,Syngonium podophyllum Albo
+P138,관엽 Foliage,싱고니움 레드스팟,Red Spot Syngonium,Syngonium erythrophyllum
+P139,관엽 Foliage,스킨답서스 픽투스,Satin Pothos,Scindapsus pictus
+P140,관엽 Foliage,스킨답서스 트레비,Scindapsus Treubii,Scindapsus treubii Moonlight
+P141,관엽 Foliage,에피프레넘 골든드래곤,Golden Dragon,Epipremnum Golden Dragon
+P142,관엽 Foliage,페페로미아 수박,Watermelon Peperomia,Peperomia argyreia
+P143,관엽 Foliage,페페로미아 로소,Peperomia Rosso,Peperomia caperata Rosso
+P144,관엽 Foliage,페페로미아 홉,Trailing Jade,Peperomia rotundifolia
+P145,관엽 Foliage,호야 리네아리스,Hoya Linearis,Hoya linearis
+P146,관엽 Foliage,호야 푸빅칼릭스,Hoya Pubicalyx,Hoya pubicalyx
+P147,관엽 Foliage,호야 컴팩타,Hindu Rope,Hoya carnosa Compacta
+P148,관엽 Foliage,디시디아 오바타,Watermelon Dischidia,Dischidia ovata
+P149,관엽 Foliage,베고니아 마소니아나,Iron Cross Begonia,Begonia masoniana
+P150,관엽 Foliage,베고니아 아메지스티나,Begonia Amethystina,Begonia amethystina
+P151,관엽 Foliage,렉스베고니아 에스카르고,Escargot Begonia,Begonia rex Escargot
+P152,관엽 Foliage,콜로카시아 블랙매직,Black Magic Taro,Colocasia esculenta Black Magic
+P153,관엽 Foliage,콜로카시아 에스쿨렌타,Elephant Ear Taro,Colocasia esculenta
+P154,관엽 Foliage,잔테데스키아 잎,Zamia Coontie,Zamia furfuracea
+P155,관엽 Foliage,아프리칸밀크트리,African Milk Tree,Euphorbia trigona
+P156,관엽 Foliage,크로톤 마모,Croton Mammy,Codiaeum variegatum Mammy
+P157,관엽 Foliage,렉스 크루엔타,Bloody Dracaena,Cordyline terminalis Red
+P158,관엽 Foliage,드라세나 리플렉사,Song of India,Dracaena reflexa
+P159,관엽 Foliage,드라세나 자넷크레이그,Janet Craig,Dracaena deremensis Janet Craig
+P160,관엽 Foliage,베아우카르네아,Ponytail Palm,Beaucarnea recurvata
+P161,관엽 Foliage,디지고테카,False Aralia,Plerandra elegantissima
+P162,관엽 Foliage,팔손이나무,Japanese Aralia,Fatsia japonica
+P163,관엽 Foliage,파트헤데라,Tree Ivy,Fatshedera lizei
+P164,관엽 Foliage,폴리시아스,Ming Aralia,Polyscias fruticosa
+P165,관엽 Foliage,쉐플레라 아마테,Umbrella Plant Amate,Schefflera actinophylla
+P166,관엽 Foliage,녹보수,Green Tree,Schefflera Green
+P167,관엽 Foliage,마오리 코로키아,Korokio,Corokia cotoneaster
+P168,관엽 Foliage,셀렘 호프,Hope Selloum,Philodendron Hope
+P169,관엽 Foliage,싱고니움 마블,Marble Syngonium,Syngonium podophyllum Marble
+P170,관엽 Foliage,아디안텀 프리츠,Fritz Luthi Fern,Adiantum raddianum Fritz Luthi
+P171,관엽 Foliage,네프롤레피스 그린레이디,Green Lady Fern,Nephrolepis Green Lady
+P172,관엽 Foliage,아스플레니움 오스무,Osmunda Nest Fern,Asplenium antiquum
+P173,관엽 Foliage,휴케라,Coral Bells,Heuchera sanguinea
+P174,관엽 Foliage,휴케렐라,Foamy Bells,Heucherella hybrid
+P175,관엽 Foliage,티아렐라,Foam Flower,Tiarella cordifolia
+P176,관엽 Foliage,람스이어,Lamb's Ear,Stachys byzantina
+P177,관엽 Foliage,은쑥,Silver Mound,Artemisia schmidtiana
+P178,관엽 Foliage,헬리크리섬 페티올라레,Licorice Plant,Helichrysum petiolare
+P179,관엽 Foliage,딜로스페마,Ice Plant Foliage,Delosperma cooperi
+P180,관엽 Foliage,유포르비아 다이아몬드,Diamond Frost,Euphorbia hypericifolia
+P181,관엽 Foliage,렉스 콜레우스 블랙,Black Coleus,Coleus Black Dragon
+P182,관엽 Foliage,이레시네,Bloodleaf,Iresine herbstii
+P183,관엽 Foliage,알테르난테라,Joseph's Coat,Alternanthera ficoidea
+P184,관엽 Foliage,백묘국,Dusty Miller,Jacobaea maritima
+P185,관엽 Foliage,글레코마,Ground Ivy Variegata,Glechoma hederacea Variegata
+P186,관엽 Foliage,디콘드라,Silver Falls,Dichondra argentea
+P187,관엽 Foliage,립살리스 버첼리,Coral Cactus Rhipsalis,Rhipsalis burchellii
+P188,관엽 Foliage,콜룸네아 골드피쉬,Goldfish Columnea,Columnea microphylla
+P189,관엽 Foliage,블루스타 고사리,Blue Star Fern,Phlebodium aureum
+P190,관엽 Foliage,크립탄서스,Earth Star,Cryptanthus bivittatus
+P191,관엽 Foliage,구즈마니아,Guzmania,Guzmania lingulata
+P192,관엽 Foliage,브로멜리아드 네오레겔리아,Neoregelia,Neoregelia carolinae
+P193,관엽 Foliage,에크메아,Urn Plant,Aechmea fasciata
+P194,관엽 Foliage,브리에세아,Flaming Sword,Vriesea splendens
+P195,관엽 Foliage,틸란드시아 카푸트,Caput Medusae,Tillandsia caput-medusae
+P196,관엽 Foliage,틸란드시아 크세로그라피카,Xerographica,Tillandsia xerographica
+P197,관엽 Foliage,디오네아 대형,Giant Venus Flytrap,Dionaea muscipula B52
+P198,관엽 Foliage,파키라 편조,Braided Money Tree,Pachira aquatica Braided
+P199,관엽 Foliage,녹영 목걸이,Green Necklace,Curio radicans Fish Hook
+P200,관엽 Foliage,칼라디움,Angel Wings,Caladium bicolor
+P201,관엽 Foliage,칼라디움 화이트퀸,White Queen Caladium,Caladium White Queen
+P202,관엽 Foliage,아스클레피아스,Butterfly Weed,Asclepias tuberosa
+P203,관엽 Foliage,유포르비아 화이트,White Euphorbia,Euphorbia leucocephala
+P204,관엽 Foliage,렉스 알로카시아 폴리,Amazon Elephant Ear,Alocasia amazonica
+P205,관엽 Foliage,싱고니움 네온,Neon Robusta,Syngonium podophyllum Neon
+P206,관엽 Foliage,페페로미아 페리스킨,Ripple Peperomia,Peperomia caperata
+P207,관엽 Foliage,피토니아 화이트,White Nerve Plant,Fittonia albivenis White
+P208,관엽 Foliage,크로톤 골드,Gold Dust Croton,Codiaeum variegatum Gold Dust
+P209,관엽 Foliage,콜레우스 레인보우,Rainbow Coleus,Coleus Rainbow
+P210,관엽 Foliage,아글라오네마 핑크,Pink Aglaonema,Aglaonema Pink Dalmatian
+P211,관엽 Foliage,디펜바키아 트로픽,Tropic Snow,Dieffenbachia Tropic Snow
+P212,관엽 Foliage,마란타 케르코비아나,Green Prayer Plant,Maranta leuconeura kerchoveana
+P213,관엽 Foliage,칼라데아 랜시폴리아,Rattlesnake Plant,Goeppertia insignis
+P214,관엽 Foliage,스트로만테 마젠타,Magenta Stromanthe,Stromanthe Magenta
+P215,관엽 Foliage,렉스 알로카시아 그린벨벳,Green Velvet Alocasia,Alocasia micholitziana Green
+P216,관엽 Foliage,안스리움 베이체이,King Anthurium,Anthurium veitchii
+P217,관엽 Foliage,안스리움 파피리스,Anthurium Papillilaminum,Anthurium papillilaminum
+P218,관엽 Foliage,필로덴드론 베루코섬,Ecuador Philodendron,Philodendron verrucosum
+P219,관엽 Foliage,필로덴드론 멜라노크리섬,Black Gold Philodendron,Philodendron melanochrysum
+P220,관엽 Foliage,라피도포라 데카시바,Dragon Tail Plant,Rhaphidophora decursiva
+P221,관엽 Foliage,호말로메나,Queen of Hearts,Homalomena rubescens
+P222,관엽 Foliage,아모르포팔루스,Voodoo Lily,Amorphophallus konjac
+P223,관엽 Foliage,안스리움 클라리네르비움 다크,Dark Velvet Anthurium,Anthurium clarinervium Dark
+P224,관엽 Foliage,페페로미아 프로스트,Frost Peperomia,Peperomia caperata Frost
+P225,관엽 Foliage,앤슈리엄 실버,Silver Anthurium,Anthurium crystallinum Silver
+P226,야자 Palm,테이블야자,Parlor Palm,Chamaedorea elegans
+P227,야자 Palm,아레카야자,Areca Palm,Dypsis lutescens
+P228,야자 Palm,관음죽,Lady Palm,Rhapis excelsa
+P229,야자 Palm,켄차야자,Kentia Palm,Howea forsteriana
+P230,야자 Palm,소철,Sago Palm,Cycas revoluta
+P231,야자 Palm,피닉스야자,Pygmy Date Palm,Phoenix roebelenii
+P232,야자 Palm,카나리야자,Canary Date Palm,Phoenix canariensis
+P233,야자 Palm,워싱토니아야자,Washingtonia Palm,Washingtonia robusta
+P234,야자 Palm,코코스야자,Queen Palm,Syagrus romanzoffiana
+P235,야자 Palm,피시테일야자,Fishtail Palm,Caryota mitis
+P236,야자 Palm,라피스야자,Broadleaf Lady Palm,Rhapis multifida
+P237,야자 Palm,세이브릴야자,European Fan Palm,Chamaerops humilis
+P238,야자 Palm,비스마르크야자,Bismarck Palm,Bismarckia nobilis
+P239,야자 Palm,라탄야자,Rattan Palm,Calamus rotang
+P240,야자 Palm,마자리야자,Mazari Palm,Nannorrhops ritchiana
+P241,다육 Succulent,다육 에케베리아,Echeveria,Echeveria elegans
+P242,다육 Succulent,립살리스,Mistletoe Cactus,Rhipsalis baccifera
+P243,다육 Succulent,칼랑코에,Kalanchoe,Kalanchoe blossfeldiana
+P244,다육 Succulent,하월시아,Haworthia,Haworthia fasciata
+P245,다육 Succulent,알로에,Aloe Vera,Aloe vera
+P246,다육 Succulent,세덤,Stonecrop,Sedum morganianum
+P247,다육 Succulent,염좌,Jade Plant,Crassula ovata
+P248,다육 Succulent,판다다육,Panda Plant,Kalanchoe tomentosa
+P249,다육 Succulent,그린네클리스,String of Pearls,Curio rowleyanus
+P250,다육 Succulent,하트호야,String of Hearts,Ceropegia woodii
+P251,다육 Succulent,아가베,Agave,Agave americana
+P252,다육 Succulent,유포르비아,Euphorbia,Euphorbia trigona
+P253,다육 Succulent,립스틱다육,Lithops,Lithops karasmontana
+P254,다육 Succulent,십이지권,Zebra Cactus,Haworthiopsis attenuata
+P255,다육 Succulent,블랙프린스,Black Prince Echeveria,Echeveria Black Prince
+P256,다육 Succulent,라울,Sedum Rubrotinctum,Sedum rubrotinctum
+P257,다육 Succulent,홍옥,Jelly Bean Plant,Sedum pachyphyllum
+P258,다육 Succulent,성미인,Pink Jade,Pachyphytum oviferum
+P259,다육 Succulent,월미인,Moonstones,Pachyphytum Moonstone
+P260,다육 Succulent,천대전송,Bear Paw,Cotyledon tomentosa
+P261,다육 Succulent,을녀심,Propeller Plant,Crassula perforata
+P262,다육 Succulent,희성,Watch Chain,Crassula muscosa
+P263,다육 Succulent,화제,Campfire Crassula,Crassula capitella
+P264,다육 Succulent,부영,Silver Dollar Plant,Crassula arborescens
+P265,다육 Succulent,용월,Copper Rose,Echeveria nodulosa
+P266,다육 Succulent,블루버드,Blue Bird Echeveria,Echeveria Blue Bird
+P267,다육 Succulent,라일락,Lilac Mist,Echeveria hybrid Lilac
+P268,다육 Succulent,아에오니움,Aeonium,Aeonium arboreum
+P269,다육 Succulent,흑법사,Black Rose Aeonium,Aeonium Zwartkop
+P270,다육 Succulent,그랍토페탈룸,Ghost Plant,Graptopetalum paraguayense
+P271,다육 Succulent,센페르비붐,Hens and Chicks,Sempervivum tectorum
+P272,다육 Succulent,세네시오 트리안굴라리스,String of Bananas,Curio radicans
+P273,다육 Succulent,돌고래다육,String of Dolphins,Curio peregrinus
+P274,다육 Succulent,녹영,String of Fishhooks,Curio herreanus
+P275,다육 Succulent,콘시나,Fairy Washboard,Haworthiopsis limifolia
+P276,다육 Succulent,가스테리아,Ox Tongue,Gasteria bicolor
+P277,다육 Succulent,아가베 빅토리아,Victoria Agave,Agave victoriae-reginae
+P278,다육 Succulent,포춘칼랑코에,Flaming Katy,Kalanchoe blossfeldiana
+P279,다육 Succulent,당인,Paddle Plant,Kalanchoe thyrsiflora
+P280,다육 Succulent,백은무,Silver Teaspoons,Kalanchoe bracteata
+P281,다육 Succulent,파키피툼 히포겔라,Sugar Almond Plant,Pachyphytum hookeri
+P282,다육 Succulent,코노피툼,Living Pebbles,Conophytum bilobum
+P283,다육 Succulent,플레이오스필로스,Split Rock,Pleiospilos nelii
+P284,다육 Succulent,페네스트라리아,Baby Toes,Fenestraria rhopalophylla
+P285,다육 Succulent,티타노프시스,Concrete Leaf,Titanopsis calcarea
+P286,다육 Succulent,페로칵타 안소니,Anthony Cactus,Ferocactus fordii
+P287,다육 Succulent,아드로미스쿠스,Crinkle Leaf Plant,Adromischus cristatus
+P288,다육 Succulent,둘리아나,Ruby Necklace,Othonna capensis
+P289,다육 Succulent,세네시오 청옥,Blue Chalksticks,Curio repens
+P290,다육 Succulent,월토이,Living Stone Lesliei,Lithops lesliei
+P291,다육 Succulent,만손초,Mother of Thousands,Kalanchoe daigremontiana
+P292,다육 Succulent,불로초,Chandelier Plant,Kalanchoe delagoensis
+P293,다육 Succulent,미인,Ghost Echeveria,Graptoveria hybrid
+P294,다육 Succulent,홍옥미인,Graptosedum,Graptosedum California Sunset
+P295,다육 Succulent,대화금,Firestorm,Sedum adolphii
+P296,다육 Succulent,아나캄프세로스,Sand Rose,Anacampseros rufescens
+P297,다육 Succulent,포르툴라카리아,Elephant Bush,Portulacaria afra
+P298,다육 Succulent,스타펠리아,Starfish Flower,Stapelia grandiflora
+P299,다육 Succulent,후에르니아,Lifesaver Plant,Huernia zebrina
+P300,다육 Succulent,세로페지아 산데르소니,Parachute Plant,Ceropegia sandersonii
+P301,다육 Succulent,코틸레돈 오르비쿨라타,Pig's Ear,Cotyledon orbiculata
+P302,다육 Succulent,에케베리아 라우이,Laui Echeveria,Echeveria laui
+P303,다육 Succulent,에케베리아 퍼플펄,Purple Pearl,Echeveria Purple Pearl
+P304,다육 Succulent,에케베리아 아가보이데스,Agavoides Echeveria,Echeveria agavoides
+P305,다육 Succulent,세네시오 헤레이아누스 빅,Big String of Pearls,Curio herreanus Big
+P306,다육 Succulent,아가베 아테누아타,Foxtail Agave,Agave attenuata
+P307,다육 Succulent,알로에 아리스타타,Lace Aloe,Aristaloe aristata
+P308,다육 Succulent,알로에 브레비폴리아,Short Leaf Aloe,Aloe brevifolia
+P309,다육 Succulent,에케베리아 룬용,Runyonii Echeveria,Echeveria runyonii
+P310,선인장 Cactus,금호선인장,Golden Barrel Cactus,Echinocactus grusonii
+P311,선인장 Cactus,게발선인장,Christmas Cactus,Schlumbergera bridgesii
+P312,선인장 Cactus,백년초,Prickly Pear,Opuntia ficus-indica
+P313,선인장 Cactus,비모란,Moon Cactus,Gymnocalycium mihanovichii
+P314,선인장 Cactus,공작선인장,Orchid Cactus,Epiphyllum oxypetalum
+P315,선인장 Cactus,페어리캐슬,Fairy Castle Cactus,Acanthocereus tetragonus
+P316,선인장 Cactus,마밀라리아,Pincushion Cactus,Mammillaria elongata
+P317,선인장 Cactus,아스트로피툼,Bishop's Cap,Astrophytum myriostigma
+P318,선인장 Cactus,셀레니세레우스,Queen of the Night,Selenicereus grandiflorus
+P319,선인장 Cactus,페로칵투스,Fishhook Barrel,Ferocactus wislizeni
+P320,선인장 Cactus,백단선인장,Peanut Cactus,Echinopsis chamaecereus
+P321,선인장 Cactus,금성선인장,Star Cactus,Astrophytum asterias
+P322,선인장 Cactus,비화옥,Rose Cactus,Pereskia grandifolia
+P323,선인장 Cactus,세레우스,Peruvian Apple Cactus,Cereus repandus
+P324,선인장 Cactus,클레이스토칵투스,Silver Torch,Cleistocactus strausii
+P325,선인장 Cactus,립살리돕시스,Easter Cactus,Rhipsalidopsis gaertneri
+P326,선인장 Cactus,오푼티아 미크로다시스,Bunny Ears,Opuntia microdasys
+P327,선인장 Cactus,노토칵투스,Ball Cactus,Parodia magnifica
+P328,선인장 Cactus,짐노칼리시움,Chin Cactus,Gymnocalycium baldianum
+P329,선인장 Cactus,터비니칼푸스,Turbinicarpus,Turbinicarpus lophophoroides
+P330,선인장 Cactus,오푼티아 산타리타,Santa Rita Prickly Pear,Opuntia santa-rita
+P331,선인장 Cactus,에키노케레우스,Hedgehog Cactus,Echinocereus pectinatus
+P332,식충 Carnivorous,파리지옥,Venus Flytrap,Dionaea muscipula
+P333,식충 Carnivorous,네펜데스,Tropical Pitcher Plant,Nepenthes ventricosa
+P334,식충 Carnivorous,사라세니아,Trumpet Pitcher,Sarracenia purpurea
+P335,식충 Carnivorous,끈끈이주걱,Sundew,Drosera rotundifolia
+P336,식충 Carnivorous,벌레잡이제비꽃,Butterwort,Pinguicula vulgaris
+P337,식충 Carnivorous,통발,Bladderwort,Utricularia vulgaris
+P338,난초 Orchid,호접란,Moth Orchid,Phalaenopsis amabilis
+P339,난초 Orchid,덴파레,Dendrobium,Dendrobium nobile
+P340,난초 Orchid,심비디움,Cymbidium,Cymbidium hybridum
+P341,난초 Orchid,동양란,Noble Orchid,Cymbidium goeringii
+P342,난초 Orchid,풍란,Wind Orchid,Neofinetia falcata
+P343,난초 Orchid,석곡,Noble Dendrobium,Dendrobium moniliforme
+P344,난초 Orchid,카틀레야,Cattleya,Cattleya labiata
+P345,난초 Orchid,온시디움,Dancing Lady Orchid,Oncidium hybridum
+P346,난초 Orchid,한란,Korean Cymbidium,Cymbidium kanran
+P347,난초 Orchid,새우난초,Christmas Orchid,Calanthe discolor
+P348,난초 Orchid,자란,Hyacinth Orchid,Bletilla striata
+P349,난초 Orchid,해오라비난초,White Egret Orchid,Pecteilis radiata
+P350,난초 Orchid,반다,Vanda Orchid,Vanda coerulea
+P351,난초 Orchid,밀토니아,Pansy Orchid,Miltonia spectabilis
+P352,난초 Orchid,파피오페딜룸,Slipper Orchid,Paphiopedilum insigne
+P353,난초 Orchid,새우난 노랑,Yellow Calanthe,Calanthe sieboldii
+P354,난초 Orchid,금새우난,Golden Calanthe,Calanthe striata
+P355,난초 Orchid,복주머니란,Lady Slipper Korean,Cypripedium macranthos
+P356,난초 Orchid,광릉요강꽃,Fan Lady Slipper,Cypripedium japonicum
+P357,난초 Orchid,나도풍란,Large Wind Orchid,Sedirea japonica
+P358,난초 Orchid,병아리난초,Small Orchid,Amitostigma gracile
+P359,난초 Orchid,타래난초,Lady's Tresses,Spiranthes sinensis
+P360,난초 Orchid,약난초,Cremastra,Cremastra appendiculata
+P361,난초 Orchid,감자난초,Oreorchis,Oreorchis patens
+P362,난초 Orchid,대흥란,Cymbidium Macrorhizon,Cymbidium macrorhizon
+P363,난초 Orchid,자주사철란,Jewel Orchid,Ludisia discolor
+P364,허브 Herb,라벤더,Lavender,Lavandula angustifolia
+P365,허브 Herb,로즈마리,Rosemary,Salvia rosmarinus
+P366,허브 Herb,바질,Basil,Ocimum basilicum
+P367,허브 Herb,민트,Mint,Mentha spicata
+P368,허브 Herb,타임,Thyme,Thymus vulgaris
+P369,허브 Herb,캐모마일,Chamomile,Matricaria chamomilla
+P370,허브 Herb,애플민트,Apple Mint,Mentha suaveolens
+P371,허브 Herb,페퍼민트,Peppermint,Mentha piperita
+P372,허브 Herb,스피어민트,Spearmint,Mentha spicata
+P373,허브 Herb,레몬밤,Lemon Balm,Melissa officinalis
+P374,허브 Herb,레몬버베나,Lemon Verbena,Aloysia citrodora
+P375,허브 Herb,레몬그라스,Lemongrass,Cymbopogon citratus
+P376,허브 Herb,오레가노,Oregano,Origanum vulgare
+P377,허브 Herb,마조람,Marjoram,Origanum majorana
+P378,허브 Herb,세이지,Sage,Salvia officinalis
+P379,허브 Herb,파인애플세이지,Pineapple Sage,Salvia elegans
+P380,허브 Herb,차이브,Chive,Allium schoenoprasum
+P381,허브 Herb,딜,Dill,Anethum graveolens
+P382,허브 Herb,펜넬,Fennel,Foeniculum vulgare
+P383,허브 Herb,파슬리,Parsley,Petroselinum crispum
+P384,허브 Herb,고수,Cilantro,Coriandrum sativum
+P385,허브 Herb,루꼴라,Arugula,Eruca vesicaria
+P386,허브 Herb,스테비아,Stevia,Stevia rebaudiana
+P387,허브 Herb,보리지,Borage,Borago officinalis
+P388,허브 Herb,캐트닙,Catnip,Nepeta cataria
+P389,허브 Herb,저먼캐모마일,German Chamomile,Matricaria recutita
+P390,허브 Herb,로먼캐모마일,Roman Chamomile,Chamaemelum nobile
+P391,허브 Herb,히솝,Hyssop,Hyssopus officinalis
+P392,허브 Herb,러비지,Lovage,Levisticum officinale
+P393,허브 Herb,타라곤,Tarragon,Artemisia dracunculus
+P394,허브 Herb,쳐빌,Chervil,Anthriscus cerefolium
+P395,허브 Herb,워터크레스,Watercress,Nasturtium officinale
+P396,허브 Herb,나스터튬,Nasturtium,Tropaeolum majus
+P397,허브 Herb,비트,Beet Herb,Beta vulgaris
+P398,허브 Herb,컴프리,Comfrey,Symphytum officinale
+P399,허브 Herb,에키네시아 허브,Purple Coneflower Herb,Echinacea angustifolia
+P400,허브 Herb,밀크시슬,Milk Thistle,Silybum marianum
+P401,허브 Herb,쑥,Korean Mugwort,Artemisia princeps
+P402,허브 Herb,개똥쑥,Sweet Wormwood,Artemisia annua
+P403,허브 Herb,향쑥,Wormwood,Artemisia absinthium
+P404,허브 Herb,산톨리나,Cotton Lavender,Santolina chamaecyparissus
+P405,허브 Herb,헬리크리섬,Curry Plant,Helichrysum italicum
+P406,허브 Herb,저먼타임,Lemon Thyme,Thymus citriodorus
+P407,허브 Herb,윈터세이보리,Winter Savory,Satureja montana
+P408,허브 Herb,쥐오줌풀 발레리안,Common Valerian,Valeriana officinalis
+P409,허브 Herb,안젤리카,Garden Angelica,Angelica archangelica
+P410,허브 Herb,캐러웨이,Caraway,Carum carvi
+P411,허브 Herb,커민,Cumin,Cuminum cyminum
+P412,허브 Herb,아니스,Anise,Pimpinella anisum
+P413,허브 Herb,베르가못,Bee Balm,Monarda didyma
+P414,허브 Herb,러시안세이지,Russian Sage,Salvia yangii
+P415,허브 Herb,골든오레가노,Golden Oregano,Origanum vulgare Aureum
+P416,꽃 Flowering,수국,Hydrangea,Hydrangea macrophylla
+P417,꽃 Flowering,제라늄,Geranium,Pelargonium hortorum
+P418,꽃 Flowering,베고니아,Begonia,Begonia semperflorens
+P419,꽃 Flowering,시클라멘,Cyclamen,Cyclamen persicum
+P420,꽃 Flowering,포인세티아,Poinsettia,Euphorbia pulcherrima
+P421,꽃 Flowering,장미,Rose,Rosa hybrida
+P422,꽃 Flowering,국화,Chrysanthemum,Chrysanthemum morifolium
+P423,꽃 Flowering,카네이션,Carnation,Dianthus caryophyllus
+P424,꽃 Flowering,거베라,Gerbera Daisy,Gerbera jamesonii
+P425,꽃 Flowering,튤립 구근,Tulip,Tulipa gesneriana
+P426,꽃 Flowering,수선화 구근,Daffodil,Narcissus pseudonarcissus
+P427,꽃 Flowering,페튜니아,Petunia,Petunia hybrida
+P428,꽃 Flowering,팬지,Pansy,Viola tricolor
+P429,꽃 Flowering,프리지아,Freesia,Freesia refracta
+P430,꽃 Flowering,라넌큘러스,Ranunculus,Ranunculus asiaticus
+P431,꽃 Flowering,아네모네,Anemone,Anemone coronaria
+P432,꽃 Flowering,히아신스,Hyacinth,Hyacinthus orientalis
+P433,꽃 Flowering,백합,Lily,Lilium longiflorum
+P434,꽃 Flowering,안개꽃,Baby's Breath,Gypsophila paniculata
+P435,꽃 Flowering,마가렛,Marguerite Daisy,Argyranthemum frutescens
+P436,꽃 Flowering,매리골드,Marigold,Tagetes erecta
+P437,꽃 Flowering,프리뮬러,Primrose,Primula vulgaris
+P438,꽃 Flowering,임파첸스,Impatiens,Impatiens walleriana
+P439,꽃 Flowering,칼라,Calla Lily,Zantedeschia aethiopica
+P440,꽃 Flowering,아마릴리스,Amaryllis,Hippeastrum hybridum
+P441,꽃 Flowering,부겐빌레아,Bougainvillea,Bougainvillea glabra
+P442,꽃 Flowering,재스민,Jasmine,Jasminum polyanthum
+P443,꽃 Flowering,치자나무,Gardenia,Gardenia jasminoides
+P444,꽃 Flowering,동백,Camellia,Camellia japonica
+P445,꽃 Flowering,철쭉,Azalea,Rhododendron indicum
+P446,꽃 Flowering,수레국화,Cornflower,Centaurea cyanus
+P447,꽃 Flowering,수선국,Spirea,Spiraea japonica
+P448,꽃 Flowering,금어초,Snapdragon,Antirrhinum majus
+P449,꽃 Flowering,루피너스,Lupine,Lupinus polyphyllus
+P450,꽃 Flowering,델피니움,Delphinium,Delphinium elatum
+P451,꽃 Flowering,디기탈리스,Foxglove,Digitalis purpurea
+P452,꽃 Flowering,플록스,Garden Phlox,Phlox paniculata
+P453,꽃 Flowering,루드베키아,Black-eyed Susan,Rudbeckia hirta
+P454,꽃 Flowering,에키네시아,Coneflower,Echinacea purpurea
+P455,꽃 Flowering,코스모스,Cosmos,Cosmos bipinnatus
+P456,꽃 Flowering,백일홍,Zinnia,Zinnia elegans
+P457,꽃 Flowering,천일홍,Globe Amaranth,Gomphrena globosa
+P458,꽃 Flowering,맨드라미,Cockscomb,Celosia cristata
+P459,꽃 Flowering,샐비어,Scarlet Sage,Salvia splendens
+P460,꽃 Flowering,버베나,Verbena,Verbena hybrida
+P461,꽃 Flowering,꽃잔디,Moss Phlox,Phlox subulata
+P462,꽃 Flowering,아게라텀,Floss Flower,Ageratum houstonianum
+P463,꽃 Flowering,비올라,Viola,Viola cornuta
+P464,꽃 Flowering,알리섬,Sweet Alyssum,Lobularia maritima
+P465,꽃 Flowering,로벨리아,Lobelia,Lobelia erinus
+P466,꽃 Flowering,다알리아,Dahlia,Dahlia pinnata
+P467,꽃 Flowering,글라디올러스,Gladiolus,Gladiolus hybridus
+P468,꽃 Flowering,수련,Water Lily,Nymphaea alba
+P469,꽃 Flowering,연꽃,Lotus,Nelumbo nucifera
+P470,꽃 Flowering,붓꽃,Iris,Iris sanguinea
+P471,꽃 Flowering,독일붓꽃,Bearded Iris,Iris germanica
+P472,꽃 Flowering,크로커스,Crocus,Crocus sativus
+P473,꽃 Flowering,무스카리,Grape Hyacinth,Muscari armeniacum
+P474,꽃 Flowering,알리움,Ornamental Onion,Allium giganteum
+P475,꽃 Flowering,작약,Peony,Paeonia lactiflora
+P476,꽃 Flowering,모란,Tree Peony,Paeonia suffruticosa
+P477,꽃 Flowering,함박꽃,Woodland Peony,Paeonia japonica
+P478,꽃 Flowering,금계국,Coreopsis,Coreopsis lanceolata
+P479,꽃 Flowering,메리골드 사프라니,French Marigold,Tagetes patula
+P480,꽃 Flowering,해바라기,Sunflower,Helianthus annuus
+P481,꽃 Flowering,클레마티스,Clematis,Clematis hybrida
+P482,꽃 Flowering,능소화,Chinese Trumpet Vine,Campsis grandiflora
+P483,꽃 Flowering,나팔꽃,Morning Glory,Ipomoea nil
+P484,꽃 Flowering,메꽃,Bindweed,Calystegia sepium
+P485,꽃 Flowering,풍접초,Spider Flower,Cleome hassleriana
+P486,꽃 Flowering,스토크,Stock,Matthiola incana
+P487,꽃 Flowering,금잔화,Pot Marigold,Calendula officinalis
+P488,꽃 Flowering,과꽃,China Aster,Callistephus chinensis
+P489,꽃 Flowering,꽃양귀비,Corn Poppy,Papaver rhoeas
+P490,꽃 Flowering,양귀비,Oriental Poppy,Papaver orientale
+P491,꽃 Flowering,겹작약,Double Peony,Paeonia lactiflora Sarah Bernhardt
+P492,꽃 Flowering,꽃기린,Crown of Thorns,Euphorbia milii
+P493,꽃 Flowering,란타나,Lantana,Lantana camara
+P494,꽃 Flowering,펜타스,Egyptian Star Cluster,Pentas lanceolata
+P495,꽃 Flowering,수퍼벨,Million Bells,Calibrachoa hybrid
+P496,꽃 Flowering,디아스시아,Twinspur,Diascia barberae
+P497,꽃 Flowering,네메시아,Nemesia,Nemesia strumosa
+P498,꽃 Flowering,바코파,Bacopa,Sutera cordata
+P499,꽃 Flowering,토레니아,Wishbone Flower,Torenia fournieri
+P500,꽃 Flowering,콜레우스 플라워,Plectranthus,Plectranthus scutellarioides
+P501,꽃 Flowering,오스테오스퍼멈,African Daisy,Osteospermum ecklonis
+P502,꽃 Flowering,가자니아,Treasure Flower,Gazania rigens
+P503,꽃 Flowering,디모르포테카,Cape Marigold,Dimorphotheca sinuata
+P504,꽃 Flowering,헬리오트로프,Heliotrope,Heliotropium arborescens
+P505,꽃 Flowering,스카비오사,Pincushion Flower,Scabiosa columbaria
+P506,꽃 Flowering,아스틸베,False Goat's Beard,Astilbe japonica
+P507,꽃 Flowering,루엘리아,Mexican Petunia,Ruellia simplex
+P508,꽃 Flowering,꽃범의꼬리,Obedient Plant,Physostegia virginiana
+P509,꽃 Flowering,벌사초 리아트리스,Blazing Star,Liatris spicata
+P510,꽃 Flowering,아칸투스,Bear's Breeches,Acanthus mollis
+P511,꽃 Flowering,아가판투스,African Lily,Agapanthus africanus
+P512,꽃 Flowering,크로코스미아,Montbretia,Crocosmia crocosmiiflora
+P513,꽃 Flowering,디에라마,Angel's Fishing Rod,Dierama pulcherrimum
+P514,꽃 Flowering,헬레보루스,Christmas Rose,Helleborus niger
+P515,꽃 Flowering,루피너스 러셀,Russell Lupine,Lupinus Russell Hybrids
+P516,꽃 Flowering,알스트로메리아,Peruvian Lily,Alstroemeria aurea
+P517,꽃 Flowering,프리틸라리아,Crown Imperial,Fritillaria imperialis
+P518,꽃 Flowering,카마시아,Camas Lily,Camassia leichtlinii
+P519,꽃 Flowering,익시아,Corn Lily,Ixia maculata
+P520,꽃 Flowering,스파락시스,Harlequin Flower,Sparaxis tricolor
+P521,꽃 Flowering,트리토니아,Flame Freesia,Tritonia crocata
+P522,꽃 Flowering,바비아나,Baboon Flower,Babiana stricta
+P523,꽃 Flowering,네리네,Guernsey Lily,Nerine bowdenii
+P524,꽃 Flowering,콜치쿰,Autumn Crocus,Colchicum autumnale
+P525,꽃 Flowering,스노드롭,Snowdrop,Galanthus nivalis
+P526,꽃 Flowering,스킬라,Siberian Squill,Scilla siberica
+P527,꽃 Flowering,치오노독사,Glory of the Snow,Chionodoxa luciliae
+P528,꽃 Flowering,푸쉬키니아,Striped Squill,Puschkinia scilloides
+P529,꽃 Flowering,에란티스,Winter Aconite,Eranthis hyemalis
+P530,꽃 Flowering,크리스마스선인장 겹,Thanksgiving Cactus,Schlumbergera truncata
+P531,꽃 Flowering,시계꽃,Passion Flower,Passiflora caerulea
+P532,꽃 Flowering,만데빌라,Mandevilla,Mandevilla sanderi
+P533,꽃 Flowering,디플라데니아,Dipladenia,Mandevilla splendens
+P534,꽃 Flowering,알라만다,Golden Trumpet,Allamanda cathartica
+P535,꽃 Flowering,티보치나,Princess Flower,Tibouchina urvilleana
+P536,꽃 Flowering,익소라,Jungle Geranium,Ixora coccinea
+P537,꽃 Flowering,히비스커스 로사,Tropical Hibiscus,Hibiscus rosa-sinensis Tropical
+P538,꽃 Flowering,브룬펠시아,Yesterday Today Tomorrow,Brunfelsia pauciflora
+P539,꽃 Flowering,메디닐라,Rose Grape,Medinilla magnifica
+P540,꽃 Flowering,파보니아,Brazilian Candles,Pavonia multiflora
+P541,꽃 Flowering,클레로덴드론,Bleeding Heart Vine,Clerodendrum thomsoniae
+P542,꽃 Flowering,쟈스민 삼바크,Arabian Jasmine,Jasminum sambac
+P543,꽃 Flowering,가데니아 자스민,Cape Jasmine,Gardenia jasminoides Veitchii
+P544,꽃 Flowering,스테파노티스,Madagascar Jasmine,Stephanotis floribunda
+P545,꽃 Flowering,플루메리아,Frangipani,Plumeria rubra
+P546,꽃 Flowering,익소라 미니,Dwarf Ixora,Ixora chinensis
+P547,꽃 Flowering,안스리움 핑크,Pink Anthurium,Anthurium andraeanum Pink
+P548,꽃 Flowering,쿠페아,Cigar Plant,Cuphea ignea
+P549,꽃 Flowering,아부틸론,Flowering Maple,Abutilon hybridum
+P550,꽃 Flowering,란타나 트레일링,Trailing Lantana,Lantana montevidensis
+P551,꽃 Flowering,수국 산수국 겹,Double Mountain Hydrangea,Hydrangea serrata Preziosa
+P552,꽃 Flowering,꽃도라지,Lisianthus,Eustoma grandiflorum
+P553,꽃 Flowering,아스터,Michaelmas Daisy,Aster novi-belgii
+P554,꽃 Flowering,국화 소국,Pompon Chrysanthemum,Chrysanthemum Pompon
+P555,꽃 Flowering,매발톱 노랑,Golden Columbine,Aquilegia chrysantha
+P556,꽃 Flowering,양귀비 아이슬란드,Iceland Poppy,Papaver nudicaule
+P557,꽃 Flowering,캄파눌라,Canterbury Bells,Campanula medium
+P558,꽃 Flowering,디기탈리스 화이트,White Foxglove,Digitalis purpurea Alba
+P559,꽃 Flowering,꽃양배추,Ornamental Cabbage,Brassica oleracea
+P560,꽃 Flowering,수련 열대,Tropical Water Lily,Nymphaea Tropical
+P561,꽃 Flowering,베고니아 볼리비엔시스,Bolivian Begonia,Begonia boliviensis
+P562,꽃 Flowering,푸크시아,Fuchsia,Fuchsia hybrida
+P563,꽃 Flowering,아잘레아 벨기에,Belgian Azalea,Rhododendron simsii
+P564,꽃 Flowering,시네라리아,Florist Cineraria,Pericallis hybrida
+P565,꽃 Flowering,베고니아 엘라티오르,Elatior Begonia,Begonia elatior
+P566,장미 Rose,넝쿨장미,Climbing Rose,Rosa Climbing
+P567,장미 Rose,미니장미,Miniature Rose,Rosa chinensis Minima
+P568,장미 Rose,플로리분다장미,Floribunda Rose,Rosa Floribunda
+P569,장미 Rose,하이브리드티장미,Hybrid Tea Rose,Rosa Hybrid Tea
+P570,장미 Rose,그랜디플로라장미,Grandiflora Rose,Rosa Grandiflora
+P571,장미 Rose,올드가든로즈,Old Garden Rose,Rosa Gallica
+P572,장미 Rose,데이비드오스틴,English Rose,Rosa David Austin
+P573,장미 Rose,해당화,Rugosa Rose,Rosa rugosa
+P574,장미 Rose,찔레꽃,Multiflora Rose,Rosa multiflora
+P575,장미 Rose,돌가시나무,Memorial Rose,Rosa luciae
+P576,구근 Bulb,글로리오사,Flame Lily,Gloriosa superba
+P577,구근 Bulb,유코미스,Pineapple Lily,Eucomis comosa
+P578,구근 Bulb,오르니소갈룸,Star of Bethlehem,Ornithogalum umbellatum
+P579,구근 Bulb,라켄알리아,Cape Cowslip,Lachenalia aloides
+P580,구근 Bulb,베로니카 구근,Persian Buttercup,Ranunculus Persian
+P581,구근 Bulb,수선화 겹,Double Daffodil,Narcissus Double
+P582,구근 Bulb,튤립 앵무,Parrot Tulip,Tulipa Parrot
+P583,구근 Bulb,히아신스 겹,Double Hyacinth,Hyacinthus orientalis Double
+P584,구근 Bulb,아마릴리스 미니,Dwarf Amaryllis,Hippeastrum Dwarf
+P585,구근 Bulb,제피란데스,Rain Lily,Zephyranthes candida
+P586,구근 Bulb,하브란서스,Copper Lily,Habranthus robustus
+P587,구근 Bulb,크리넘,Crinum Lily,Crinum asiaticum
+P588,구근 Bulb,불비네,Snake Flower,Bulbine frutescens
+P589,구근 Bulb,벨레발리아,Grape Hyacinth Dark,Bellevalia pycnantha
+P590,구근 Bulb,트리텔레이아,Triplet Lily,Triteleia laxa
+P591,관목 Shrub,남천나무,Heavenly Bamboo,Nandina domestica
+P592,관목 Shrub,진달래,Korean Rhododendron,Rhododendron mucronulatum
+P593,관목 Shrub,영산홍,Satsuki Azalea,Rhododendron indicum
+P594,관목 Shrub,만병초,Rosebay Rhododendron,Rhododendron brachycarpum
+P595,관목 Shrub,수국 목수국,Panicle Hydrangea,Hydrangea paniculata
+P596,관목 Shrub,나무수국,Smooth Hydrangea,Hydrangea arborescens
+P597,관목 Shrub,산수국,Mountain Hydrangea,Hydrangea serrata
+P598,관목 Shrub,개나리,Korean Forsythia,Forsythia koreana
+P599,관목 Shrub,수수꽃다리,Korean Lilac,Syringa oblata
+P600,관목 Shrub,병꽃나무,Korean Weigela,Weigela subsessilis
+P601,관목 Shrub,화살나무,Winged Spindle,Euonymus alatus
+P602,관목 Shrub,사철나무,Japanese Spindle,Euonymus japonicus
+P603,관목 Shrub,회양목,Korean Boxwood,Buxus koreana
+P604,관목 Shrub,쥐똥나무,Border Privet,Ligustrum obtusifolium
+P605,관목 Shrub,광나무,Glossy Privet,Ligustrum japonicum
+P606,관목 Shrub,백당나무,Snowball Viburnum,Viburnum opulus
+P607,관목 Shrub,분꽃나무,Korean Spice Viburnum,Viburnum carlesii
+P608,관목 Shrub,불두화,Japanese Snowball,Viburnum plicatum
+P609,관목 Shrub,황매화,Japanese Kerria,Kerria japonica
+P610,관목 Shrub,명자나무,Flowering Quince,Chaenomeles speciosa
+P611,관목 Shrub,고광나무,Mock Orange,Philadelphus schrenkii
+P612,관목 Shrub,수국백당,Doublefile Viburnum,Viburnum plicatum tomentosum
+P613,관목 Shrub,매자나무,Korean Barberry,Berberis koreana
+P614,관목 Shrub,자산홍,Kurume Azalea,Rhododendron obtusum
+P615,관목 Shrub,꽝꽝나무,Japanese Holly,Ilex crenata
+P616,관목 Shrub,호랑가시나무,Chinese Holly,Ilex cornuta
+P617,관목 Shrub,피라칸타,Firethorn,Pyracantha angustifolia
+P618,관목 Shrub,죽절초,Sarcandra,Sarcandra glabra
+P619,관목 Shrub,좀작살나무,Purple Beautyberry,Callicarpa dichotoma
+P620,관목 Shrub,꽃댕강나무,Glossy Abelia,Abelia grandiflora
+P621,관목 Shrub,골드무늬사철,Golden Euonymus,Euonymus japonicus Aureomarginatus
+P622,관목 Shrub,애기동백,Sasanqua Camellia,Camellia sasanqua
+P623,관목 Shrub,차나무,Tea Plant,Camellia sinensis
+P624,관목 Shrub,협죽도,Oleander,Nerium oleander
+P625,관목 Shrub,무궁화,Rose of Sharon,Hibiscus syriacus
+P626,관목 Shrub,부용,Confederate Rose,Hibiscus mutabilis
+P627,관목 Shrub,히비스커스,Chinese Hibiscus,Hibiscus rosa-sinensis
+P628,관목 Shrub,수국백묘,PeeGee Hydrangea,Hydrangea paniculata Grandiflora
+P629,관목 Shrub,백철쭉,White Azalea,Rhododendron mucronatum
+P630,관목 Shrub,겹벚꽃 만첩,Double Cherry,Prunus serrulata Kwanzan
+P631,관목 Shrub,정향나무,Manchurian Lilac,Syringa patula
+P632,관목 Shrub,미스김라일락,Miss Kim Lilac,Syringa pubescens patula
+P633,관목 Shrub,고광나무 왕꽃,Big Flower Mock Orange,Philadelphus grandiflorus
+P634,관목 Shrub,병아리꽃나무,Black Jetbead,Rhodotypos scandens
+P635,관목 Shrub,골담초,Chinese Pea Tree,Caragana sinica
+P636,관목 Shrub,싸리나무,Bush Clover,Lespedeza bicolor
+P637,관목 Shrub,족제비싸리,False Indigo,Amorpha fruticosa
+P638,관목 Shrub,붉은병꽃,Red Weigela,Weigela florida
+P639,관목 Shrub,댕강나무,Korean Abelia,Zabelia tyaihyonii
+P640,관목 Shrub,인동 괴불나무,Amur Honeysuckle,Lonicera maackii
+P641,관목 Shrub,백당수국,Guelder Rose,Viburnum opulus sargentii
+P642,관목 Shrub,가막살나무,Linden Viburnum,Viburnum dilatatum
+P643,관목 Shrub,덜꿩나무,Leatherleaf Viburnum,Viburnum erosum
+P644,관목 Shrub,분꽃나무 향,Fragrant Snowball,Viburnum burkwoodii
+P645,관목 Shrub,낙상홍,Japanese Winterberry,Ilex serrata
+P646,관목 Shrub,대팻집나무,Macropoda Holly,Ilex macropoda
+P647,관목 Shrub,피라칸타 레드,Scarlet Firethorn,Pyracantha coccinea
+P648,관목 Shrub,코토네아스터,Rockspray Cotoneaster,Cotoneaster horizontalis
+P649,관목 Shrub,홍자단,Bearberry Cotoneaster,Cotoneaster dammeri
+P650,관목 Shrub,화백 골드,Golden Mop Cypress,Chamaecyparis pisifera Filifera Aurea
+P651,관목 Shrub,조록싸리,Maximowicz Bush Clover,Lespedeza maximowiczii
+P652,관목 Shrub,생강나무,Korean Spicebush,Lindera obtusiloba
+P653,관목 Shrub,쥐방울덩굴 관목,Beautyberry Japanese,Callicarpa japonica
+P654,관목 Shrub,자주받침꽃,Carolina Allspice,Calycanthus floridus
+P655,관목 Shrub,종덩굴,Bush Clematis,Clematis heracleifolia
+P656,관목 Shrub,백정화,Snowrose Serissa,Serissa japonica
+P657,관목 Shrub,만리향,Fragrant Olive,Osmanthus fragrans
+P658,관목 Shrub,구골나무,Holly Osmanthus,Osmanthus heterophyllus
+P659,관목 Shrub,돈나무,Japanese Pittosporum,Pittosporum tobira
+P660,관목 Shrub,다정큼나무,Yeddo Hawthorn,Rhaphiolepis indica
+P661,관목 Shrub,팔손이 관목,Fatsia Spider,Fatsia japonica Spider Web
+P662,관목 Shrub,황금사철,Golden Spindle,Euonymus japonicus Aureus
+P663,관목 Shrub,애기말발도리 겹,Double Deutzia,Deutzia scabra
+P664,관목 Shrub,히페리쿰,Shrubby St Johns Wort,Hypericum patulum
+P665,관목 Shrub,만병초 서양,Catawba Rhododendron,Rhododendron catawbiense
+P666,관목 Shrub,수국 아나벨,Annabelle Hydrangea,Hydrangea arborescens Annabelle
+P667,관목 Shrub,수국 엔들리스,Endless Summer,Hydrangea macrophylla Endless Summer
+P668,관목 Shrub,블루베리 하이부시,Highbush Blueberry,Vaccinium virgatum
+P669,관목 Shrub,히어리,Korean Winter Hazel,Corylopsis coreana
+P670,관목 Shrub,납매,Wintersweet,Chimonanthus praecox
+P671,관목 Shrub,풍년화,Witch Hazel,Hamamelis japonica
+P672,관목 Shrub,미선나무,White Forsythia,Abeliophyllum distichum
+P673,조경수 Tree,벚나무,Cherry Blossom,Prunus serrulata
+P674,조경수 Tree,왕벚나무,Yoshino Cherry,Prunus yedoensis
+P675,조경수 Tree,단풍나무,Japanese Maple,Acer palmatum
+P676,조경수 Tree,홍단풍,Red Maple,Acer palmatum Atropurpureum
+P677,조경수 Tree,은행나무,Ginkgo,Ginkgo biloba
+P678,조경수 Tree,느티나무,Zelkova,Zelkova serrata
+P679,조경수 Tree,메타세쿼이아,Dawn Redwood,Metasequoia glyptostroboides
+P680,조경수 Tree,플라타너스,London Plane,Platanus acerifolia
+P681,조경수 Tree,이팝나무,Chinese Fringe Tree,Chionanthus retusus
+P682,조경수 Tree,조팝나무,Bridal Wreath,Spiraea prunifolia
+P683,조경수 Tree,목련,Magnolia,Magnolia kobus
+P684,조경수 Tree,백목련,White Magnolia,Magnolia denudata
+P685,조경수 Tree,자목련,Purple Magnolia,Magnolia liliiflora
+P686,조경수 Tree,태산목,Southern Magnolia,Magnolia grandiflora
+P687,조경수 Tree,배롱나무,Crape Myrtle,Lagerstroemia indica
+P688,조경수 Tree,산딸나무,Kousa Dogwood,Cornus kousa
+P689,조경수 Tree,층층나무,Giant Dogwood,Cornus controversa
+P690,조경수 Tree,산수유,Cornelian Cherry,Cornus officinalis
+P691,조경수 Tree,모과나무,Chinese Quince,Pseudocydonia sinensis
+P692,조경수 Tree,감나무,Persimmon,Diospyros kaki
+P693,조경수 Tree,대추나무,Jujube,Ziziphus jujuba
+P694,조경수 Tree,밤나무,Chestnut,Castanea crenata
+P695,조경수 Tree,호두나무,Walnut,Juglans regia
+P696,조경수 Tree,자작나무,Birch,Betula platyphylla
+P697,조경수 Tree,버드나무,Willow,Salix koreensis
+P698,조경수 Tree,수양버들,Weeping Willow,Salix babylonica
+P699,조경수 Tree,회화나무,Chinese Scholar Tree,Styphnolobium japonicum
+P700,조경수 Tree,아까시나무,Black Locust,Robinia pseudoacacia
+P701,조경수 Tree,칠엽수,Horse Chestnut,Aesculus turbinata
+P702,조경수 Tree,마로니에,Common Horse Chestnut,Aesculus hippocastanum
+P703,조경수 Tree,튤립나무,Tulip Tree,Liriodendron tulipifera
+P704,조경수 Tree,오동나무,Empress Tree,Paulownia tomentosa
+P705,조경수 Tree,계수나무,Katsura Tree,Cercidiphyllum japonicum
+P706,조경수 Tree,때죽나무,Japanese Snowbell,Styrax japonicus
+P707,조경수 Tree,쪽동백나무,Fragrant Snowbell,Styrax obassia
+P708,조경수 Tree,노각나무,Korean Stewartia,Stewartia pseudocamellia
+P709,조경수 Tree,물푸레나무,Korean Ash,Fraxinus rhynchophylla
+P710,조경수 Tree,팽나무,Chinese Hackberry,Celtis sinensis
+P711,조경수 Tree,참나무,Oak,Quercus acutissima
+P712,조경수 Tree,상수리나무,Sawtooth Oak,Quercus acutissima
+P713,조경수 Tree,후박나무,Machilus,Machilus thunbergii
+P714,조경수 Tree,녹나무,Camphor Tree,Cinnamomum camphora
+P715,조경수 Tree,먼나무,Kurogane Holly,Ilex rotunda
+P716,조경수 Tree,아왜나무,Sweet Viburnum,Viburnum odoratissimum
+P717,조경수 Tree,때죽 노각,Snowbell Tree,Halesia carolina
+P718,조경수 Tree,중국단풍,Trident Maple,Acer buergerianum
+P719,조경수 Tree,고로쇠나무,Painted Maple,Acer pictum
+P720,조경수 Tree,신나무,Amur Maple,Acer tataricum ginnala
+P721,조경수 Tree,복자기,Three-flowered Maple,Acer triflorum
+P722,조경수 Tree,대왕참나무,Pin Oak,Quercus palustris
+P723,조경수 Tree,갈참나무,Oriental Oak,Quercus aliena
+P724,조경수 Tree,졸참나무,Konara Oak,Quercus serrata
+P725,조경수 Tree,루브라참나무,Red Oak,Quercus rubra
+P726,조경수 Tree,서어나무,Korean Hornbeam,Carpinus laxiflora
+P727,조경수 Tree,소사나무,Korean Hornbeam Turczaninowii,Carpinus turczaninowii
+P728,조경수 Tree,오리나무,Japanese Alder,Alnus japonica
+P729,조경수 Tree,자귀나무,Silk Tree,Albizia julibrissin
+P730,조경수 Tree,주엽나무,Honey Locust,Gleditsia japonica
+P731,조경수 Tree,칠자화,Seven Son Flower,Heptacodium miconioides
+P732,조경수 Tree,함박나무 백합,Yulan,Magnolia sieboldii
+P733,조경수 Tree,별목련,Star Magnolia,Magnolia stellata
+P734,조경수 Tree,일본목련,Japanese Bigleaf Magnolia,Magnolia obovata
+P735,조경수 Tree,다릅나무,Amur Maackia,Maackia amurensis
+P736,조경수 Tree,황벽나무,Amur Cork Tree,Phellodendron amurense
+P737,조경수 Tree,고광나무 산조팝,Sawtooth Spirea,Spiraea salicifolia
+P738,조경수 Tree,때죽동백 노각,Tall Stewartia,Stewartia monadelpha
+P739,조경수 Tree,버즘나무,American Sycamore,Platanus occidentalis
+P740,조경수 Tree,양버들,Lombardy Poplar,Populus nigra Italica
+P741,조경수 Tree,이태리포플러,Hybrid Poplar,Populus euramericana
+P742,조경수 Tree,중국굴피나무,Chinese Wingnut,Pterocarya stenoptera
+P743,조경수 Tree,가래나무,Manchurian Walnut,Juglans mandshurica
+P744,조경수 Tree,헛개나무,Japanese Raisin Tree,Hovenia dulcis
+P745,조경수 Tree,두충나무,Hardy Rubber Tree,Eucommia ulmoides
+P746,조경수 Tree,벽오동,Chinese Parasol Tree,Firmiana simplex
+P747,조경수 Tree,감태나무,Gray Blue Spicebush,Lindera glauca
+P748,조경수 Tree,비목나무,Faber Spicebush,Lindera erythrocarpa
+P749,조경수 Tree,쉬나무,Bee Bee Tree,Tetradium daniellii
+P750,조경수 Tree,멀구슬나무,Chinaberry,Melia azedarach
+P751,조경수 Tree,참죽나무,Chinese Toon,Toona sinensis
+P752,침엽수 Conifer,에메랄드그린,Emerald Green Arborvitae,Thuja occidentalis Smaragd
+P753,침엽수 Conifer,소나무,Korean Red Pine,Pinus densiflora
+P754,침엽수 Conifer,반송,Tanyosho Pine,Pinus densiflora Umbraculifera
+P755,침엽수 Conifer,백송,Lacebark Pine,Pinus bungeana
+P756,침엽수 Conifer,잣나무,Korean Pine Nut,Pinus koraiensis
+P757,침엽수 Conifer,리기다소나무,Pitch Pine,Pinus rigida
+P758,침엽수 Conifer,곰솔,Black Pine,Pinus thunbergii
+P759,침엽수 Conifer,전나무,Needle Fir,Abies holophylla
+P760,침엽수 Conifer,구상나무,Korean Fir,Abies koreana
+P761,침엽수 Conifer,분비나무,Manchurian Fir,Abies nephrolepis
+P762,침엽수 Conifer,가문비나무,Yeddo Spruce,Picea jezoensis
+P763,침엽수 Conifer,주목,Japanese Yew,Taxus cuspidata
+P764,침엽수 Conifer,측백나무,Oriental Arborvitae,Platycladus orientalis
+P765,침엽수 Conifer,편백나무,Hinoki Cypress,Chamaecyparis obtusa
+P766,침엽수 Conifer,화백나무,Sawara Cypress,Chamaecyparis pisifera
+P767,침엽수 Conifer,향나무,Chinese Juniper,Juniperus chinensis
+P768,침엽수 Conifer,가이즈카향나무,Hollywood Juniper,Juniperus chinensis Kaizuka
+P769,침엽수 Conifer,노간주나무,Temple Juniper,Juniperus rigida
+P770,침엽수 Conifer,낙엽송,Japanese Larch,Larix kaempferi
+P771,침엽수 Conifer,금송,Umbrella Pine,Sciadopitys verticillata
+P772,침엽수 Conifer,삼나무,Japanese Cedar,Cryptomeria japonica
+P773,침엽수 Conifer,히말라야시다,Deodar Cedar,Cedrus deodara
+P774,침엽수 Conifer,독일가문비,Norway Spruce,Picea abies
+P775,침엽수 Conifer,연필향나무,Eastern Red Cedar,Juniperus virginiana
+P776,침엽수 Conifer,블루엔젤,Blue Angel Juniper,Juniperus Blue Angel
+P777,침엽수 Conifer,섬잣나무,Japanese White Pine,Pinus parviflora
+P778,침엽수 Conifer,스트로브잣나무,Eastern White Pine,Pinus strobus
+P779,침엽수 Conifer,방크스소나무,Jack Pine,Pinus banksiana
+P780,침엽수 Conifer,오스트리안소나무,Austrian Pine,Pinus nigra
+P781,침엽수 Conifer,스코틀랜드소나무,Scots Pine,Pinus sylvestris
+P782,침엽수 Conifer,솔송나무,Southern Japanese Hemlock,Tsuga sieboldii
+P783,침엽수 Conifer,개비자나무,Japanese Plum Yew,Cephalotaxus harringtonii
+P784,침엽수 Conifer,비자나무,Japanese Nutmeg Yew,Torreya nucifera
+P785,침엽수 Conifer,금강소나무,Golden Larch,Pseudolarix amabilis
+P786,침엽수 Conifer,낙우송,Bald Cypress,Taxodium distichum
+P787,침엽수 Conifer,미국측백,Northern White Cedar,Thuja occidentalis
+P788,침엽수 Conifer,레일란디측백,Leyland Cypress,Cupressus leylandii
+P789,침엽수 Conifer,애리조나측백,Arizona Cypress,Cupressus arizonica
+P790,침엽수 Conifer,코니카가문비,Dwarf Alberta Spruce,Picea glauca Conica
+P791,침엽수 Conifer,블루스프루스,Colorado Blue Spruce,Picea pungens
+P792,침엽수 Conifer,분비 발삼전나무,Balsam Fir,Abies balsamea
+P793,침엽수 Conifer,일본전나무,Momi Fir,Abies firma
+P794,침엽수 Conifer,히말라야소나무,Bhutan Pine,Pinus wallichiana
+P795,침엽수 Conifer,눈향나무,Creeping Juniper,Juniperus procumbens
+P796,침엽수 Conifer,울릉솔송,Ulleung Hemlock,Tsuga ulleungensis
+P797,침엽수 Conifer,풍겐스가문비,Serbian Spruce,Picea omorika
+P798,덩굴 Vine,등나무,Japanese Wisteria,Wisteria floribunda
+P799,덩굴 Vine,인동덩굴,Japanese Honeysuckle,Lonicera japonica
+P800,덩굴 Vine,담쟁이덩굴,Boston Ivy,Parthenocissus tricuspidata
+P801,덩굴 Vine,으름덩굴,Chocolate Vine,Akebia quinata
+P802,덩굴 Vine,머루,Wild Grape,Vitis amurensis
+P803,덩굴 Vine,다래,Hardy Kiwi,Actinidia arguta
+P804,덩굴 Vine,마삭줄,Star Jasmine,Trachelospermum asiaticum
+P805,덩굴 Vine,줄사철나무,Fortune's Spindle,Euonymus fortunei
+P806,덩굴 Vine,송악,Korean Ivy,Hedera rhombea
+P807,덩굴 Vine,오미자,Magnolia Vine,Schisandra chinensis
+P808,덩굴 Vine,모람,Creeping Fig,Ficus pumila
+P809,덩굴 Vine,헤데라 헬릭스,Common Ivy,Hedera helix
+P810,대나무 Bamboo,황금죽,Golden Bamboo,Phyllostachys aurea
+P811,대나무 Bamboo,왕대,Giant Timber Bamboo,Phyllostachys bambusoides
+P812,대나무 Bamboo,맹종죽,Moso Bamboo,Phyllostachys edulis
+P813,대나무 Bamboo,오죽,Black Bamboo,Phyllostachys nigra
+P814,대나무 Bamboo,조릿대,Broadleaf Bamboo,Sasa borealis
+P815,대나무 Bamboo,이대,Female Bamboo,Pseudosasa japonica
+P816,대나무 Bamboo,사사조릿대,Dwarf Bamboo,Pleioblastus fortunei
+P817,대나무 Bamboo,신이대,Sea Bamboo,Sasa coreana
+P818,그라스 Grass,수크령,Fountain Grass,Pennisetum alopecuroides
+P819,그라스 Grass,억새,Silver Grass,Miscanthus sinensis
+P820,그라스 Grass,핑크뮬리,Pink Muhly Grass,Muhlenbergia capillaris
+P821,그라스 Grass,블루페스큐,Blue Fescue,Festuca glauca
+P822,그라스 Grass,모닝라이트,Maiden Grass,Miscanthus sinensis Morning Light
+P823,그라스 Grass,팜파스그라스,Pampas Grass,Cortaderia selloana
+P824,그라스 Grass,라임그라스,Blue Lyme Grass,Leymus arenarius
+P825,그라스 Grass,사초,Japanese Sedge,Carex morrowii
+P826,그라스 Grass,블루오트그라스,Blue Oat Grass,Helictotrichon sempervirens
+P827,그라스 Grass,스위치그라스,Switch Grass,Panicum virgatum
+P828,그라스 Grass,갈대,Common Reed,Phragmites australis
+P829,그라스 Grass,줄,Manchurian Wild Rice,Zizania latifolia
+P830,그라스 Grass,털무늬억새,Zebra Grass,Miscanthus sinensis Zebrinus
+P831,그라스 Grass,수크령 하멜른,Dwarf Fountain Grass,Pennisetum alopecuroides Hameln
+P832,그라스 Grass,자주달개비,Purple Fountain Grass,Pennisetum setaceum Rubrum
+P833,그라스 Grass,카렉스 에버골드,Evergold Sedge,Carex oshimensis Evergold
+P834,그라스 Grass,일본풍지초,Japanese Forest Grass,Hakonechloa macra
+P835,그라스 Grass,블루페스큐 엘리야,Elijah Blue Fescue,Festuca glauca Elijah Blue
+P836,그라스 Grass,모닝라이트 억새,Morning Light Grass,Miscanthus sinensis Gracillimus
+P837,그라스 Grass,리본그라스,Ribbon Grass,Phalaris arundinacea
+P838,그라스 Grass,피버그라스,Feather Reed Grass,Calamagrostis acutiflora
+P839,그라스 Grass,멕시코깃털그라스,Mexican Feather Grass,Nassella tenuissima
+P840,그라스 Grass,골풀,Common Rush,Juncus effusus
+P841,그라스 Grass,나사골풀,Corkscrew Rush,Juncus effusus Spiralis
+P842,그라스 Grass,실새풀,Korean Feather Reed,Calamagrostis arundinacea
+P843,지피 Groundcover,맥문동,Big Blue Lilyturf,Liriope muscari
+P844,지피 Groundcover,수호초,Japanese Pachysandra,Pachysandra terminalis
+P845,지피 Groundcover,아주가,Bugleweed,Ajuga reptans
+P846,지피 Groundcover,세덤 지피,Creeping Sedum,Sedum kamtschaticum
+P847,지피 Groundcover,땅채송화,Golden Carpet,Sedum oryzifolium
+P848,지피 Groundcover,애기말발도리,Slender Deutzia,Deutzia gracilis
+P849,지피 Groundcover,백리향,Creeping Thyme,Thymus quinquecostatus
+P850,지피 Groundcover,벌노랑이,Bird's Foot Trefoil,Lotus corniculatus
+P851,지피 Groundcover,잔디,Korean Lawngrass,Zoysia japonica
+P852,지피 Groundcover,클로버,White Clover,Trifolium repens
+P853,지피 Groundcover,버들잎해란초,Creeping Speedwell,Veronica prostrata
+P854,지피 Groundcover,사철채송화,Rose Moss,Portulaca grandiflora
+P855,지피 Groundcover,송엽국,Ice Plant Lampranthus,Lampranthus spectabilis
+P856,지피 Groundcover,꽃마리,Trigonotis,Trigonotis peduncularis
+P857,지피 Groundcover,벌깨덩굴,Meehania,Meehania urticifolia
+P858,지피 Groundcover,금창초,Bugle Korean,Ajuga decumbens
+P859,지피 Groundcover,미나리아재비,Buttercup,Ranunculus japonicus
+P860,지피 Groundcover,양지꽃,Cinquefoil,Potentilla fragarioides
+P861,지피 Groundcover,딸기 관상,Mock Strawberry,Duchesnea indica
+P862,지피 Groundcover,붉은토끼풀,Red Clover,Trifolium pratense
+P863,지피 Groundcover,애기나리,Fairy Bells,Disporum smilacinum
+P864,지피 Groundcover,맥문동 청화,Creeping Lilyturf,Liriope spicata
+P865,지피 Groundcover,소엽맥문동,Dwarf Mondo Grass,Ophiopogon japonicus
+P866,지피 Groundcover,수레바퀴 마조람,Creeping Marjoram,Origanum vulgare Compactum
+P867,자생초 Native,할미꽃,Korean Pasque Flower,Pulsatilla koreana
+P868,자생초 Native,금낭화,Bleeding Heart,Lamprocapnos spectabilis
+P869,자생초 Native,매발톱꽃,Columbine,Aquilegia buergeriana
+P870,자생초 Native,얼레지,Dogtooth Violet,Erythronium japonicum
+P871,자생초 Native,노루귀,Hepatica,Hepatica asiatica
+P872,자생초 Native,복수초,Amur Adonis,Adonis amurensis
+P873,자생초 Native,동의나물,Marsh Marigold,Caltha palustris
+P874,자생초 Native,앵초,Primrose Korean,Primula sieboldii
+P875,자생초 Native,구절초,Korean Chrysanthemum,Dendranthema zawadskii
+P876,자생초 Native,쑥부쟁이,Aster Korean,Aster yomena
+P877,자생초 Native,벌개미취,Korean Starwort,Aster koraiensis
+P878,자생초 Native,용담,Gentian,Gentiana scabra
+P879,자생초 Native,물레나물,St Johns Wort,Hypericum ascyron
+P880,자생초 Native,비비추,Hosta,Hosta longipes
+P881,자생초 Native,옥잠화,Fragrant Plantain Lily,Hosta plantaginea
+P882,자생초 Native,원추리,Daylily,Hemerocallis fulva
+P883,자생초 Native,둥굴레,Solomon's Seal,Polygonatum odoratum
+P884,자생초 Native,은방울꽃,Lily of the Valley,Convallaria keiskei
+P885,자생초 Native,꿩의비름,Showy Stonecrop,Hylotelephium spectabile
+P886,자생초 Native,돌나물,Sedum Korean,Sedum sarmentosum
+P887,자생초 Native,바위취,Strawberry Saxifrage,Saxifraga stolonifera
+P888,자생초 Native,민들레,Dandelion,Taraxacum platycarpum
+P889,자생초 Native,제비꽃,Manchurian Violet,Viola mandshurica
+P890,자생초 Native,패랭이꽃,Fringed Pink,Dianthus chinensis
+P891,자생초 Native,술패랭이,Fringed Pink Long,Dianthus longicalyx
+P892,자생초 Native,금꿩의다리,Meadow Rue,Thalictrum rochebrualatum
+P893,자생초 Native,매미꽃,Korean Poppy,Coreanomecon hylomeconoides
+P894,자생초 Native,피나물,Forest Poppy,Hylomecon vernalis
+P895,자생초 Native,동자꽃,Lychnis,Lychnis cognata
+P896,자생초 Native,마타리,Golden Lace,Patrinia scabiosifolia
+P897,자생초 Native,꽃무릇,Red Spider Lily,Lycoris radiata
+P898,자생초 Native,상사화,Magic Lily,Lycoris squamigera
+P899,자생초 Native,금강초롱꽃,Korean Bellflower,Hanabusaya asiatica
+P900,자생초 Native,초롱꽃,Spotted Bellflower,Campanula punctata
+P901,자생초 Native,잔대,Japanese Lady Bell,Adenophora triphylla
+P902,자생초 Native,더덕,Deodeok,Codonopsis lanceolata
+P903,자생초 Native,도라지,Balloon Flower,Platycodon grandiflorus
+P904,자생초 Native,금마타리,Golden Patrinia,Patrinia saniculifolia
+P905,자생초 Native,쥐오줌풀,Valerian,Valeriana fauriei
+P906,자생초 Native,꽃향유,Korean Mint Perilla,Elsholtzia splendens
+P907,자생초 Native,배초향,Korean Mint,Agastache rugosa
+P908,자생초 Native,층꽃나무,Blue Spirea,Caryopteris incana
+P909,자생초 Native,벌등골나무,Boneset,Eupatorium japonicum
+P910,자생초 Native,미역취,Goldenrod,Solidago virgaurea
+P911,자생초 Native,참취,Aster Scaber,Aster scaber
+P912,자생초 Native,곰취,Fischer Ligularia,Ligularia fischeri
+P913,자생초 Native,곤달비,Ligularia Stenocephala,Ligularia stenocephala
+P914,자생초 Native,수리취,Synurus,Synurus deltoides
+P915,자생초 Native,톱풀,Yarrow,Achillea alpina
+P916,자생초 Native,기린초,Kamtschatka Stonecrop,Phedimus kamtschaticus
+P917,자생초 Native,바위솔,Rock Pine,Orostachys japonica
+P918,자생초 Native,땅나리,Morning Star Lily,Lilium callosum
+P919,자생초 Native,하늘나리,Sky Lily,Lilium concolor
+P920,자생초 Native,참나리,Tiger Lily,Lilium lancifolium
+P921,자생초 Native,말나리,Distinctive Lily,Lilium distichum
+P922,자생초 Native,털중나리,Amabile Lily,Lilium amabile
+P923,자생초 Native,얼레지 흰,White Dogtooth Violet,Erythronium japonicum Album
+P924,자생초 Native,깽깽이풀,Twinleaf Korean,Jeffersonia dubia
+P925,자생초 Native,피나물 노랑,Yellow Wood Poppy,Hylomecon vernalis Yellow
+P926,자생초 Native,매발톱 하늘,Blue Columbine,Aquilegia flabellata
+P927,자생초 Native,금붓꽃,Golden Iris,Iris minutoaurea
+P928,자생초 Native,각시붓꽃,Rockery Iris,Iris rossii
+P929,자생초 Native,타래붓꽃,Spiral Iris,Iris lactea
+P930,자생초 Native,범부채,Blackberry Lily,Iris domestica
+P931,자생초 Native,투구꽃,Monkshood,Aconitum jaluense
+P932,자생초 Native,백리향 자생,Korean Thyme,Thymus quinquecostatus Wild
+P933,자생초 Native,자란 흰,White Bletilla,Bletilla striata Alba
+P934,자생초 Native,섬초롱꽃,Island Bellflower,Campanula takesimana
+P935,양치 Fern,고비,Royal Fern,Osmunda japonica
+P936,양치 Fern,관중,Male Fern,Dryopteris crassirhizoma
+P937,양치 Fern,꿩고비,Cinnamon Fern,Osmundastrum cinnamomeum
+P938,양치 Fern,청나래고사리,Ostrich Fern,Matteuccia struthiopteris
+P939,양치 Fern,십자고사리,Holly Fern,Polystichum tripteron
+P940,양치 Fern,일엽초,Bird Nest Fern Korean,Lepisorus thunbergianus
+P941,양치 Fern,콩짜개덩굴,Green Penny Fern,Lemmaphyllum microphyllum
+P942,양치 Fern,고사리삼,Grape Fern,Sceptridium ternatum
+P943,양치 Fern,처녀고사리,Marsh Fern,Thelypteris palustris
+P944,양치 Fern,봉의꼬리,Chinese Brake,Pteris multifida
+P945,양치 Fern,돌담고사리,Wall Rue,Asplenium ruta-muraria
+P946,양치 Fern,부싯깃고사리,Silverback Fern,Cheilanthes argentea
+P947,수생 Aquatic,부레옥잠,Water Hyacinth,Eichhornia crassipes
+P948,수생 Aquatic,물양귀비,Water Poppy,Hydrocleys nymphoides
+P949,수생 Aquatic,창포,Sweet Flag,Acorus calamus
+P950,수생 Aquatic,꽃창포,Japanese Water Iris,Iris ensata
+P951,수생 Aquatic,노랑꽃창포,Yellow Flag Iris,Iris pseudacorus
+P952,수생 Aquatic,물옥잠,Monochoria,Monochoria korsakowii
+P953,수생 Aquatic,어리연꽃,Water Snowflake,Nymphoides indica
+P954,수생 Aquatic,물배추,Water Lettuce,Pistia stratiotes
+P955,수생 Aquatic,개구리밥,Duckweed,Spirodela polyrhiza
+P956,수생 Aquatic,택사,Water Plantain,Alisma canaliculatum
+P957,수생 Aquatic,물수세미,Water Milfoil,Myriophyllum verticillatum
+P958,수생 Aquatic,고랭이,Bulrush,Schoenoplectus tabernaemontani
+P959,수생 Aquatic,물미나리아재비,Water Buttercup,Ranunculus aquatilis
+P960,수생 Aquatic,가래,Pondweed,Potamogeton distinctus
+P961,수생 Aquatic,물질경이,Water Poppy Ottelia,Ottelia alismoides
+P962,수생 Aquatic,물수국,Water Hydrangea,Hydrocharis dubia
+P963,수생 Aquatic,물아카시아,Water Sensitive Plant,Neptunia oleracea
+P964,수생 Aquatic,자라풀,Frogbit,Hydrocharis morsus-ranae
+P965,수생 Aquatic,물봉선,Touch Me Not,Impatiens textori
+P966,수생 Aquatic,매화마름,Water Crowfoot,Ranunculus kazusensis
+P967,수생 Aquatic,순채,Water Shield,Brasenia schreberi
+P968,수생 Aquatic,가시연꽃,Prickly Water Lily,Euryale ferox
+P969,수생 Aquatic,왜개연꽃,Small Spatterdock,Nuphar pumila
+P970,수생 Aquatic,네가래,Water Clover,Marsilea quadrifolia
+P971,과실수 Fruit,레몬나무,Lemon Tree,Citrus limon
+P972,과실수 Fruit,사과나무,Apple Tree,Malus domestica
+P973,과실수 Fruit,배나무,Pear Tree,Pyrus pyrifolia
+P974,과실수 Fruit,복숭아나무,Peach Tree,Prunus persica
+P975,과실수 Fruit,매실나무,Japanese Apricot,Prunus mume
+P976,과실수 Fruit,살구나무,Apricot,Prunus armeniaca
+P977,과실수 Fruit,자두나무,Plum Tree,Prunus salicina
+P978,과실수 Fruit,포도나무,Grape Vine,Vitis vinifera
+P979,과실수 Fruit,무화과나무,Fig Tree,Ficus carica
+P980,과실수 Fruit,석류나무,Pomegranate,Punica granatum
+P981,과실수 Fruit,블루베리,Blueberry,Vaccinium corymbosum
+P982,과실수 Fruit,앵두나무,Nanking Cherry,Prunus tomentosa
+P983,과실수 Fruit,보리수나무,Autumn Olive,Elaeagnus umbellata
+P984,과실수 Fruit,유자나무,Yuzu,Citrus junos
+P985,과실수 Fruit,귤나무,Mandarin Orange,Citrus reticulata
+P986,과실수 Fruit,금귤,Kumquat,Citrus japonica
+P987,열대과실 Tropical,커피나무,Coffee Plant,Coffea arabica
+P988,열대과실 Tropical,망고,Mango,Mangifera indica
+P989,열대과실 Tropical,아보카도,Avocado,Persea americana
+P990,열대과실 Tropical,구아바,Guava,Psidium guajava
+P991,열대과실 Tropical,파파야,Papaya,Carica papaya
+P992,열대과실 Tropical,패션프루트,Passion Fruit,Passiflora edulis
+P993,열대과실 Tropical,바나나,Banana,Musa acuminata
+P994,열대과실 Tropical,파인애플,Pineapple,Ananas comosus
+P995,열대과실 Tropical,용과,Dragon Fruit,Hylocereus undatus
+P996,열대과실 Tropical,리치,Lychee,Litchi chinensis
+P997,열대과실 Tropical,람부탄,Rambutan,Nephelium lappaceum
+P998,열대과실 Tropical,스타프루트,Starfruit,Averrhoa carambola
+P999,열대과실 Tropical,올리브 열매,Olive Fruit,Olea europaea Fruit
+P1000,열대과실 Tropical,카카오,Cacao,Theobroma cacao
+P1001,열대과실 Tropical,망고스틴,Mangosteen,Garcinia mangostana
