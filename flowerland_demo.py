@@ -373,31 +373,33 @@ def _csv_int(v, default=0):
     except (ValueError, TypeError):
         return default
 
-def import_nurseries_csv(file_bytes, replace=False):
-    """CSV(농원+취급식물)를 읽어 nursery/stock 테이블에 등록.
-    · 같은 농원ID의 여러 줄은 하나의 농원으로 묶고 각 줄을 취급식물로 등록
-    · 취급식물은 ID(P001) 우선, 없으면 이름으로 카탈로그 매칭
-    · replace=True면 기존 농원·재고·배정로그를 모두 지우고 새로 등록
-    반환: {'nurseries': n, 'stocks': m, 'warnings': [...]}"""
+def parse_nurseries_csv(file_bytes):
+    """CSV를 파싱만 한다(DB 반영 없음). 미리보기·검증용.
+    반환: {'nurseries': {...}, 'stocks': {...}, 'warnings': [...],
+           'headers': [...], 'encoding': str, 'delimiter': str}"""
     import io as _io, csv as _csv
     # 인코딩 자동 감지: 엑셀(UTF-8 BOM) / 한글 윈도우(CP949·EUC-KR) 모두 지원
-    text = None
+    text, used_enc = None, "?"
     for enc in ("utf-8-sig", "cp949", "euc-kr", "utf-8"):
         try:
             text = file_bytes.decode(enc)
+            used_enc = enc
             break
         except (UnicodeDecodeError, LookupError):
             continue
     if text is None:
-        text = file_bytes.decode("utf-8", errors="replace")
-    # 구분자 자동 감지(쉼표/세미콜론/탭)
-    first = next((ln for ln in text.splitlines() if ln.strip()), "")
+        text = file_bytes.decode("utf-8", errors="replace"); used_enc = "utf-8(강제)"
+    # 엑셀이 넣는 'sep=,' 첫 줄 제거
+    lines = text.splitlines()
+    if lines and lines[0].lower().startswith("sep="):
+        lines = lines[1:]; text = "\n".join(lines)
+    first = next((ln for ln in lines if ln.strip()), "")
     delim = max([",", ";", "\t"], key=first.count) if first else ","
     reader = _csv.DictReader(_io.StringIO(text), delimiter=delim)
 
     def g(row, *names):
         for k, val in row.items():
-            if k and k.strip() in names:
+            if k and k.strip().lstrip("\ufeff") in names:
                 return (val or "").strip()
         return ""
 
@@ -423,11 +425,20 @@ def import_nurseries_csv(file_bytes, replace=False):
                 stocks[(nid, pid)] = (_csv_int(g(row, "재고수량", "qty")),
                                       _csv_int(g(row, "최저가", "price_min")),
                                       _csv_int(g(row, "최고가", "price_max")))
+    return {"nurseries": nurseries, "stocks": stocks, "warnings": warns,
+            "headers": [h.lstrip("\ufeff") for h in (reader.fieldnames or [])],
+            "encoding": used_enc, "delimiter": {",": "쉼표", ";": "세미콜론", "\t": "탭"}[delim]}
+
+def import_nurseries_csv(file_bytes, replace=False, parsed=None):
+    """CSV(농원+취급식물)를 nursery/stock 테이블에 반영.
+    parsed가 주어지면(미리보기 재사용) 파싱을 건너뛴다.
+    반환: {'nurseries': n, 'stocks': m, 'warnings': [...]}"""
+    p = parsed or parse_nurseries_csv(file_bytes)
+    nurseries, stocks, warns = p["nurseries"], p["stocks"], list(p["warnings"])
 
     if not nurseries:
-        hdr = ", ".join(reader.fieldnames or [])
-        warns.append(f"등록된 농원이 없습니다. 인식된 헤더: [{hdr}]. "
-                     "'농원명'/'농원ID' 열이 있는지, 저장 형식(CSV UTF-8 권장)을 확인하세요.")
+        warns.append(f"등록된 농원이 없습니다. 인식된 헤더: [{', '.join(p['headers'])}]. "
+                     "'농원명'/'농원ID' 열이 있는지 확인하세요.")
 
     if replace:
         conn.execute("DELETE FROM stock")
@@ -1809,19 +1820,53 @@ elif page == "admin":
                            file_name="농원_취급식물_양식.csv", mime="text/csv",
                            use_container_width=True)
         up_csv = st.file_uploader("작성한 CSV 파일 선택", type=["csv"], key="nur_csv")
+        parsed = None
+        if up_csv is not None:
+            # ── 파일을 고르면 즉시 파싱 미리보기 (DB 반영 전) ──
+            try:
+                parsed = parse_nurseries_csv(up_csv.getvalue())
+                st.info(f"🔎 미리보기 — 인코딩: {parsed['encoding']} · "
+                        f"구분자: {parsed['delimiter']} · "
+                        f"농원 **{len(parsed['nurseries'])}곳** · "
+                        f"취급식물 **{len(parsed['stocks'])}건** 인식됨")
+                st.caption("인식된 헤더: " + ", ".join(parsed["headers"]))
+                if parsed["nurseries"]:
+                    prev = [(nid, v[0], v[5], v[6]) for nid, v
+                            in list(parsed["nurseries"].items())[:5]]
+                    st.dataframe({"농원ID": [p[0] for p in prev],
+                                  "농원명": [p[1] for p in prev],
+                                  "주소": [p[2] for p in prev],
+                                  "대표전화": [p[3] for p in prev]},
+                                 use_container_width=True, height=len(prev)*38+40)
+                else:
+                    st.warning("⚠️ 농원이 0곳 인식됐습니다. '농원명' 또는 '농원ID' "
+                               "열 이름이 정확한지 위 헤더 목록과 비교해 보세요.")
+                if parsed["warnings"]:
+                    with st.expander(f"⚠️ 파싱 경고 {len(parsed['warnings'])}건"):
+                        for w in parsed["warnings"][:80]:
+                            st.caption("· " + w)
+            except Exception as e:
+                import traceback as _tb
+                st.error(f"파일 읽기 실패: {type(e).__name__} — {e}")
+                st.code(_tb.format_exc()[-600:])
         rep = st.checkbox("기존 농원·재고를 모두 지우고 새로 등록(전체 교체)", value=False,
                           help="체크하면 시연용 80개 데모 농원을 포함해 전부 삭제 후 등록합니다.")
-        if up_csv is not None and st.button("업로드 실행", type="primary",
-                                            use_container_width=True):
+        if parsed and parsed["nurseries"] and st.button(
+                "업로드 실행 (DB 반영)", type="primary", use_container_width=True):
             try:
-                ss.last_import = import_nurseries_csv(up_csv.getvalue(), replace=rep)
+                ss.last_import = import_nurseries_csv(up_csv.getvalue(),
+                                                      replace=rep, parsed=parsed)
             except Exception as e:
-                ss.last_import = {"error": f"{type(e).__name__} — {str(e)[:200]}"}
+                import traceback as _tb
+                ss.last_import = {"error": f"{type(e).__name__} — {str(e)[:300]}",
+                                  "trace": _tb.format_exc()[-800:]}
             st.rerun()   # 대시보드 지표·표를 새 데이터로 갱신
         li = ss.get("last_import")
         if li:
             if li.get("error"):
                 st.error(f"업로드 실패: {li['error']}")
+                if li.get("trace"):
+                    st.code(li["trace"])
             elif li["nurseries"] == 0:
                 st.warning("⚠️ 등록된 농원이 없습니다. 파일 형식(CSV UTF-8)과 헤더를 확인하세요.")
             else:
