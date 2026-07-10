@@ -23,7 +23,7 @@ _MASTER_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plants_m
 
 # 스키마 버전: 구조가 바뀌면 이 숫자를 올린다.
 # 앱은 DB의 버전이 이 값과 다르면 DB를 통째로 재생성한다.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3      # v3: 데모 농원 수 80 → 40
 
 
 def db_is_valid(conn):
@@ -39,7 +39,7 @@ def db_is_valid(conn):
         return False
 
 # ── 농원 생성 파라미터 ──────────────────────────────────────────
-N_NURSERY = 80                      # 불로화훼단지 농원 수(데모)
+N_NURSERY = 40                      # 불로화훼단지 농원 수(데모)
 ZONES = ["A동", "B동", "C동", "D동", "E동", "노지구역"]
 
 

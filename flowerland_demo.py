@@ -1227,7 +1227,7 @@ if page == "home":
     ICON_ASPECT = ["165/222", "172/222", "172/222", "172/222"]
     for col, e, ic, asp, t, s, tgt in zip(cols, "🗺️🪴🔍💧", ICON_FILES, ICON_ASPECT,
             ["농원 지도", "분갈이·화분 특화", "식물 건강 진단", "내 식물 관리"],
-            ["80개 농원 안내", "특화 농원 보기", "시든 식물 처방", "물·영양 알림"],
+            ["40개 농원 안내", "특화 농원 보기", "시든 식물 처방", "물·영양 알림"],
             ["map", "repot", "diag", "care"]):
         with col:
             if asset(ic):
@@ -1339,7 +1339,7 @@ elif page == "face":
         # 카드 자체에서 바로 조작: 식물을 끌어 이동 · 핀치/휠로 크기 → 카드 PNG 저장
         interactive_card(ss.face_img, pid, copy, score, greeting)
 
-        st.markdown("#### 80개 전체 농원 노출 · 최우수 매칭")
+        st.markdown("#### 40개 전체 농원 노출 · 최우수 매칭")
         b = best_nursery(pid, "fun01")
         if b: best_card(b, pid)
         if st.button("처음부터 다시", use_container_width=True):
@@ -1609,7 +1609,7 @@ elif page == "admin":
                 st.caption("시연 편의를 위해 각 농원 PIN은 아래에서 확인 가능합니다. "
                            "실서비스에서는 상인회가 개별 발급합니다.")
                 if st.checkbox("전체 PIN 표시"):
-                    rows = conn.execute("SELECT id, name, pin FROM nursery ORDER BY id LIMIT 80").fetchall()
+                    rows = conn.execute("SELECT id, name, pin FROM nursery ORDER BY id LIMIT 100").fetchall()
                     st.dataframe({"농원ID":[r[0] for r in rows],
                                   "이름":[r[1] for r in rows],
                                   "PIN":[r[2] for r in rows]}, height=200)
@@ -1850,7 +1850,7 @@ elif page == "admin":
                 st.error(f"파일 읽기 실패: {type(e).__name__} — {e}")
                 st.code(_tb.format_exc()[-600:])
         rep = st.checkbox("기존 농원·재고를 모두 지우고 새로 등록(전체 교체)", value=False,
-                          help="체크하면 시연용 80개 데모 농원을 포함해 전부 삭제 후 등록합니다.")
+                          help="체크하면 시연용 데모 농원 전체를 포함해 전부 삭제 후 등록합니다.")
         if parsed and parsed["nurseries"] and st.button(
                 "업로드 실행 (DB 반영)", type="primary", use_container_width=True):
             try:
