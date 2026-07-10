@@ -769,6 +769,63 @@ def interactive_card(img_bytes, pid, copy_text, score, greeting,
     </script>
     """, height=560)
 
+def pinch_image(pid, init_size=62, height=340):
+    """DB(카탈로그) 식물 이미지를 핀치/휠로 크기 조절 + 드래그로 이동해서 보는 뷰어.
+    assets/plants/{PID}.png 일러스트가 있으면 사용, 없으면 도형 폴백."""
+    ill = plant_illust(pid)
+    _pi = _white_to_transparent(ill) if ill else draw_plant(400, "blue" if pid == "P416" else None)
+    _b = io.BytesIO(); _pi.save(_b, "PNG")
+    img_b64 = base64.b64encode(_b.getvalue()).decode()
+    components.html(f"""
+    <div id="box" style="position:relative; width:100%; height:{height-46}px;
+         background:#f5faf5; border:1px solid #dcecdc; border-radius:12px;
+         touch-action:none; user-select:none; overflow:hidden;">
+      <img id="img" src="data:image/png;base64,{img_b64}"
+           style="position:absolute; left:50%; top:50%; width:{init_size}%; height:auto;
+                  transform:translate(-50%,-50%); cursor:grab;
+                  filter:drop-shadow(0 4px 8px rgba(0,0,0,.2));">
+    </div>
+    <div style="text-align:center; color:#888; font-size:12px; margin-top:7px;
+         font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;">
+       👆 두 손가락(또는 마우스 휠)으로 크기 조절 · 끌어서 이동</div>
+    <script>
+    (function(){{
+      const box=document.getElementById('box'), img=document.getElementById('img');
+      let px=50, py=50, scale={init_size};
+      function apply(){{ img.style.left=px+'%'; img.style.top=py+'%'; img.style.width=scale+'%'; }}
+      function rect(){{ return box.getBoundingClientRect(); }}
+      let dragging=false, ox=0, oy=0;
+      function sd(cx,cy){{ dragging=true; img.style.cursor='grabbing'; const r=rect();
+        ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
+      function mv(cx,cy){{ if(!dragging)return; const r=rect();
+        px=Math.min(98,Math.max(2,((cx-r.left-ox)/r.width)*100));
+        py=Math.min(98,Math.max(2,((cy-r.top-oy)/r.height)*100)); apply(); }}
+      function ed(){{ dragging=false; img.style.cursor='grab'; }}
+      img.addEventListener('mousedown',e=>{{sd(e.clientX,e.clientY);e.preventDefault();}});
+      window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));
+      window.addEventListener('mouseup',ed);
+      box.addEventListener('wheel',e=>{{ scale=Math.min(170,Math.max(15,
+        scale-Math.sign(e.deltaY)*4)); apply(); e.preventDefault(); }},{{passive:false}});
+      let pinch=0, s0={init_size};
+      function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+        return Math.hypot(dx,dy); }}
+      box.addEventListener('touchstart',e=>{{
+        if(e.touches.length===1) sd(e.touches[0].clientX,e.touches[0].clientY);
+        else if(e.touches.length===2){{ dragging=false; pinch=dist(e.touches); s0=scale; }}
+        e.preventDefault();
+      }},{{passive:false}});
+      box.addEventListener('touchmove',e=>{{
+        if(e.touches.length===1) mv(e.touches[0].clientX,e.touches[0].clientY);
+        else if(e.touches.length===2&&pinch>0){{ scale=Math.min(170,Math.max(15,
+          s0*(dist(e.touches)/pinch))); apply(); }}
+        e.preventDefault();
+      }},{{passive:false}});
+      box.addEventListener('touchend',e=>{{ if(e.touches.length===0){{ed(); pinch=0;}} }});
+      apply();
+    }})();
+    </script>
+    """, height=height)
+
 # ── 라우팅 ───────────────────────────────────────────────────────────────────
 ss = st.session_state
 ss.setdefault("page", "home")
@@ -977,11 +1034,10 @@ elif page == "plant":
     name = PLANT_NAMES[pid]
     st.markdown(f"## 🌿 {name}")
 
-    # ⓪ 일러스트 (있는 식물만 — assets/plants/{PID}.png 로 추가 가능)
+    # ⓪ 일러스트 (있는 식물만) — 핀치/휠로 크기 조절 · 끌어서 이동
     ill = plant_illust(pid)
     if ill:
-        _c = st.columns([1, 2, 1])[1]
-        _c.image(_thumb(ill, 640), use_container_width=True)
+        pinch_image(pid)
 
     # ① API(제미나이): 식물 유형·소개
     st.markdown("### 식물 소개")
@@ -1350,6 +1406,11 @@ elif page == "search":
         # ── ① API(제미나이): 식물 유형·소개 ──────────────────────
         st.markdown("### 🌿 식물 소개")
         show_plant_intro(disp_name, registered=bool(pid))
+
+        # ── DB 카탈로그 이미지 (핀치/휠로 크기 조절 · 끌어서 이동) ──
+        if pid:
+            st.markdown("### 🖼️ 카탈로그 이미지")
+            pinch_image(pid)
 
         # ── ② DB: 취급 농원·재고 ────────────────────────────────
         st.markdown("### 🏪 어느 농원에 있나요")
