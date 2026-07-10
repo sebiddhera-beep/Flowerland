@@ -1050,7 +1050,7 @@ NOTICES = [
 
 def header():
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)  # 로고 상단 여백
-    c1, c2 = st.columns([3, 1])
+    c1, c2 = st.columns([5, 2], vertical_alignment="center")  # 로고 높이에 맞춰 세로 가운데
     logo = asset("FL_Land.png")
     with c1:
         # FL_Land.png 로고 자체가 홈 버튼 (탭하면 홈으로) — 테두리·여백 없이 로고만
@@ -1063,7 +1063,7 @@ def header():
                 go("home")
     with c2:
         # 🔔 알림 벨 (신규 소식·예약 알림)
-        with st.popover("🔔", use_container_width=True):
+        with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=True):
             st.markdown("**📣 새 소식 · 예약 알림**")
             for ico, txt in NOTICES:
                 st.markdown(f"{ico} {txt}")
