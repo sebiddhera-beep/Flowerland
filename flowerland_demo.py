@@ -275,10 +275,12 @@ def greeting_for_gender(gender):
     if g.startswith("m") or "남" in g:
         return GREETING_MALE
     return f"{USER_NAME} 님"          # 성별 불명 → 기존 기본 인사말
-INDOOR_RECS  = {"거실": ["P001", "P004", "P227"], "침실": ["P008", "P002", "P005"],
-                "사무실": ["P006", "P002", "P008"]}
-OUTDOOR_RECS = {"베란다": ["P010", "P365", "P241"], "정원": ["P416", "P591", "P752"],
-                "테라스": ["P416", "P011", "P752"]}
+INDOOR_RECS  = {"거실": ["P001", "P004", "P227", "P002", "P006"],
+                "침실": ["P008", "P002", "P005", "P001", "P227"],
+                "사무실": ["P006", "P002", "P008", "P001", "P005"]}
+OUTDOOR_RECS = {"베란다": ["P010", "P365", "P241", "P011", "P591"],
+                "정원": ["P416", "P591", "P752", "P010", "P241"],
+                "테라스": ["P416", "P011", "P752", "P365", "P591"]}
 DIAG_CLASSES = [
     ("과습", "물주기를 절반으로 줄이고 배수 구멍 확인. 겉흙 3cm 마른 뒤 관수"),
     ("건조", "즉시 저면관수 30분. 이후 주 1~2회 규칙 관수로 전환"),
@@ -534,15 +536,21 @@ def plant_image(pid, size=380, flower=None):
             pass
     return draw_plant(size, flower)
 
-def draw_plant(size=300, flower=None):
-    """화분+식물 일러스트 (flower='blue'면 수국 스타일)"""
+POT_STYLES = {
+    "토분":             ((193, 121, 82), (210, 140, 100), (150, 90, 60)),
+    "플라스틱(화이트)": ((236, 236, 238), (247, 247, 249), (186, 186, 190)),
+    "야외용(다크)":     ((92, 98, 104), (112, 118, 124), (62, 66, 72)),
+}
+def draw_plant(size=300, flower=None, pot=None):
+    """화분+식물 일러스트 (flower='blue'면 수국 스타일, pot으로 화분 색 변경)"""
     im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     s = size / 300.0
+    body, rim, line = POT_STYLES.get(pot, POT_STYLES["토분"])
     # 화분
     d.polygon([(105*s, 210*s), (195*s, 210*s), (180*s, 285*s), (120*s, 285*s)],
-              fill=(193, 121, 82, 255), outline=(150, 90, 60, 255), width=int(3*s))
-    d.rectangle([98*s, 200*s, 202*s, 216*s], fill=(210, 140, 100, 255))
+              fill=body + (255,), outline=line + (255,), width=int(3*s))
+    d.rectangle([98*s, 200*s, 202*s, 216*s], fill=rim + (255,))
     # 줄기
     d.line([(150*s, 210*s), (150*s, 110*s)], fill=(60, 120, 60, 255), width=int(7*s))
     if flower == "blue":  # 수국
@@ -656,6 +664,89 @@ def composite_plant(bg_bytes, pid, x_pct, y_pct, scale_pct, label):
                         radius=10, fill=(255, 255, 255, 235))
     d.text((x+ps/2-tw/2, y+ps+14), label, font=f, fill=(30, 60, 30))
     return out
+
+def place_stage(pid, key="stage", height=520):
+    """공간 사진 위에 식물을 얹어, 핀치(크기)·드래그로 실시간 배치해보는 미리보기.
+    별도 '확정' 버튼 없이 화면에서 바로 체험한다(2손가락=크기+위치, 1손가락=스크롤)."""
+    bg_b64 = base64.b64encode(ss.sp_img).decode()
+    ill = plant_illust(pid)
+    _pi = _white_to_transparent(ill) if ill else \
+        draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
+    _buf = io.BytesIO(); _pi.save(_buf, "PNG")
+    plant_b64 = base64.b64encode(_buf.getvalue()).decode()
+    components.html(f"""
+    <div id="{key}" style="position:relative; width:100%; max-width:640px; margin:0 auto;
+         touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
+         box-shadow:0 2px 10px rgba(0,0,0,.15);">
+      <img src="data:image/jpeg;base64,{bg_b64}"
+           style="width:100%; display:block; pointer-events:none;">
+      <img id="{key}_p" src="data:image/png;base64,{plant_b64}"
+           style="position:absolute; left:60%; top:62%; width:40%; height:auto;
+                  transform:translate(-50%,-50%); cursor:grab;
+                  filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));">
+      <div style="position:absolute; left:8px; bottom:8px; background:rgba(46,125,50,.85);
+           color:#fff; font-size:12px; padding:3px 9px; border-radius:8px;">
+        {PLANT_NAMES.get(pid,'')} — 두 손가락으로 크기·위치 · 한 손가락은 스크롤</div>
+    </div>
+    <script>
+    (function(){{
+      const stage=document.getElementById('{key}'), plant=document.getElementById('{key}_p');
+      let px=60, py=62, scale=40, dragging=false, ox=0, oy=0;
+      function apply(){{ plant.style.left=px+'%'; plant.style.top=py+'%'; plant.style.width=scale+'%'; }}
+      function rect(){{ return stage.getBoundingClientRect(); }}
+      function sd(cx,cy){{ dragging=true; plant.style.cursor='grabbing'; const r=rect();
+        ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
+      function mv(cx,cy){{ if(!dragging)return; const r=rect();
+        px=Math.min(95,Math.max(5,((cx-r.left-ox)/r.width)*100));
+        py=Math.min(95,Math.max(5,((cy-r.top-oy)/r.height)*100)); apply(); }}
+      function ed(){{ dragging=false; plant.style.cursor='grab'; }}
+      plant.addEventListener('mousedown',e=>{{sd(e.clientX,e.clientY);e.preventDefault();}});
+      window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));
+      window.addEventListener('mouseup',ed);
+      stage.addEventListener('wheel',e=>{{ scale=Math.min(90,Math.max(10,
+        scale-Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
+      let pinch=0, s0=40, px0=0, py0=0, mx0=0, my0=0;
+      function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY; return Math.hypot(dx,dy); }}
+      function mid(t){{ return {{x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}}; }}
+      stage.addEventListener('touchstart',e=>{{
+        if(e.touches.length===2){{ const r=rect(), m=mid(e.touches);
+          dragging=false; pinch=dist(e.touches); s0=scale;
+          px0=px; py0=py; mx0=(m.x-r.left)/r.width*100; my0=(m.y-r.top)/r.height*100;
+          e.preventDefault(); }}
+      }},{{passive:false}});
+      stage.addEventListener('touchmove',e=>{{
+        if(e.touches.length===2 && pinch>0){{ const r=rect(), m=mid(e.touches);
+          scale=Math.min(90,Math.max(10, s0*(dist(e.touches)/pinch)));
+          const mx=(m.x-r.left)/r.width*100, my=(m.y-r.top)/r.height*100;
+          px=Math.min(95,Math.max(5, px0+(mx-mx0))); py=Math.min(95,Math.max(5, py0+(my-my0)));
+          apply(); e.preventDefault(); }}
+      }},{{passive:false}});
+      stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
+      apply();
+    }})();
+    </script>
+    """, height=height)
+
+def plant_picker(recs, key):
+    """추천 식물 타일(가로 나열). 탭하면 선택되어 색이 진해지고 ss.sp_pid가 바뀌며,
+    사진(배치 스테이지)에 즉시 반영된다."""
+    sel = ss.get("sp_pid")
+    if sel not in recs:
+        sel = recs[0]; ss.sp_pid = sel
+    cols = st.columns(len(recs))
+    for col, rp in zip(cols, recs):
+        with col:
+            ill = plant_illust(rp)
+            if ill:
+                st.image(_thumb(ill, 200), use_container_width=True)
+            else:
+                st.markdown("<div style='text-align:center;font-size:36px'>🌿</div>",
+                            unsafe_allow_html=True)
+            if st.button(("✅ " if rp == sel else "") + PLANT_NAMES[rp],
+                         key=f"{key}_{rp}", use_container_width=True,
+                         type="primary" if rp == sel else "secondary"):
+                ss.sp_pid = rp; st.rerun()
+    return sel
 
 def interactive_card(img_bytes, pid, copy_text, score, greeting,
                      init_x=72, init_y=50, init_s=44):
@@ -1176,7 +1267,7 @@ elif page == "space":
             recs = [pid_of(n, fb) for n, fb in zip(ai.get("plants", []), _fallback)]
             # 유효하지 않은 PID(마스터에 없음)는 기본 추천으로 교체
             recs = [(p if p in PLANT_NAMES else fb)
-                    for p, fb in zip(recs + _fallback, _fallback)][:3]
+                    for p, fb in zip(recs + _fallback, _fallback)][:5]
             if not recs:
                 recs = _fallback
             ss.sp_match = int(ai.get("match", 97))
@@ -1196,36 +1287,39 @@ elif page == "space":
             recs = (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
             ss.sp_match = 95 + h % 5
             ss.sp_reason = ""
-        for r in range(2):
-            c1, c2 = st.columns(2)
-            for col, (e, t, s) in zip((c1, c2), cards[r*2:r*2+2]):
-                col.markdown(f"<div class='acard'><span class='e'>{e}</span><br>"
-                             f"<span class='t'>{t}</span><br><span class='s'>{s}</span></div>",
-                             unsafe_allow_html=True)
+        # ── 분석 카드 4종을 한 줄로 압축 (요청: 한 줄로) ──
+        chips = " &nbsp;·&nbsp; ".join(
+            f"{e} <b>{t}</b> {s.split('<br>')[0]}" for (e, t, s) in cards)
+        st.markdown(f"<div class='acard' style='text-align:left; font-size:13px; "
+                    f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
         st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
-        st.markdown("#### 추천 식물들")
-        cols = st.columns(3)
-        for col, pid in zip(cols, recs):
-            ill = plant_illust(pid)
-            if ill:
-                col.image(_thumb(ill, 240), use_container_width=True)
-                col.markdown(f"<div style='text-align:center'><b>{PLANT_NAMES[pid]}</b> 👍</div>",
-                             unsafe_allow_html=True)
-            else:
-                col.markdown(f"<div class='top5'><div style='font-size:34px'>🌿</div>"
-                             f"<b>{PLANT_NAMES[pid]}</b> 👍</div>", unsafe_allow_html=True)
-        ss.sp_recs = recs      # 4단계에서 3종 추천 재사용
-        ss.sp_pid = st.radio("가상 배치할 식물 선택",
-                             recs, format_func=lambda p: PLANT_NAMES[p], horizontal=True)
-        if st.button("다음", type="primary", use_container_width=True):
+
+        # ── 추천 식물 5종: 탭해서 배치할 식물 선택(선택 시 색이 진해짐) ──
+        ss.sp_recs = recs
+        st.markdown("#### 🌿 추천 식물 5종 · 배치할 식물을 탭하세요")
+        plant_picker(recs, "pick2")
+        if st.button("다음 →", type="primary", use_container_width=True):
             ss.space_step = 3; st.rerun()
 
     elif step == 3:
-        pid = ss.sp_pid
+        recs = ss.get("sp_recs") or [ss.sp_pid]
         st.markdown("<div class='step'>3단계: 가상 플랜테리어 체험</div>", unsafe_allow_html=True)
-        mode = st.radio("합성 방식", ["🤖 AI 실사 합성 (Gemini)", "🎚️ 수동 배치 (슬라이더)"],
-                        horizontal=True, index=0 if gemini_on() else 1)
-        if mode.startswith("🤖"):
+        # 수동 배치를 기본값으로, AI 합성은 두 번째 (요청 4)
+        mode = st.radio("합성 방식", ["🎚️ 수동 배치", "🤖 AI 실사 합성 (Gemini)"],
+                        horizontal=True, index=0)
+        if mode.startswith("🎚️"):
+            pid = ss.sp_pid
+            st.caption("✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 "
+                       "(PC는 드래그 이동, 휠로 크기)")
+            place_stage(pid, key="st3")     # 확정 버튼 없이 실시간 배치 (요청 6)
+            st.markdown("##### 🌿 다른 식물 배치해보기 · 탭하면 사진에 올라옵니다 (요청 5)")
+            plant_picker(recs, "pick3")
+            _pot = ["토분", "플라스틱(화이트)", "야외용(다크)"]
+            ss.pot_style = st.selectbox("🏺 화분 스타일", _pot,
+                                        index=_pot.index(ss.get("pot_style", "토분")),
+                                        help="일러스트가 도형인 식물의 화분 색에 반영됩니다.")
+        else:
+            pid = ss.sp_pid
             if not gemini_on():
                 st.warning("사이드바에 Gemini API 키를 입력하면 실사 합성이 가능합니다.")
             else:
@@ -1245,157 +1339,33 @@ elif page == "space":
                              caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Gemini)")
                     if st.button("🔄 다시 합성하기", use_container_width=True):
                         ss.comp_key = None; st.rerun()
-        else:
-            st.caption("✌️ 두 손가락으로 식물의 크기·위치를 조절한 뒤 ‘이 위치로 확정’을 누르세요. "
-                       "한 손가락은 화면 스크롤. (PC는 드래그 이동, 휠로 크기)")
-            # 서버가 이전에 확정한 값이 있으면 초기 위치로 사용
-            init_x = ss.get("mx", 50); init_y = ss.get("my", 60); init_s = ss.get("msc", 38)
-            # 배경(공간 사진) + 식물 이미지를 base64로 브라우저에 전달 → 실시간 조작
-            bg_b64 = base64.b64encode(ss.sp_img).decode()
-            ill = plant_illust(pid)
-            if ill:
-                _pi = _white_to_transparent(ill)   # 흰 배경 투명 처리
-                _buf = io.BytesIO(); _pi.save(_buf, "PNG")
-                plant_b64 = base64.b64encode(_buf.getvalue()).decode()
-            else:
-                _pl = draw_plant(400, "blue" if pid == "P416" else None)
-                _buf = io.BytesIO(); _pl.save(_buf, "PNG")
-                plant_b64 = base64.b64encode(_buf.getvalue()).decode()
-
-            components.html(f"""
-            <div id="stage" style="position:relative; width:100%; max-width:700px;
-                 margin:0 auto; touch-action:pan-y; user-select:none; border-radius:12px;
-                 overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.15);">
-              <img id="bg" src="data:image/jpeg;base64,{bg_b64}"
-                   style="width:100%; display:block; pointer-events:none;">
-              <img id="plant" src="data:image/png;base64,{plant_b64}"
-                   style="position:absolute; left:{init_x}%; top:{init_y}%; width:{init_s}%;
-                          transform:translate(-50%,-50%); cursor:grab;
-                          filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));">
-              <div style="position:absolute; left:8px; bottom:8px; background:rgba(46,125,50,.85);
-                   color:#fff; font-size:12px; padding:3px 9px; border-radius:8px;">
-                {PLANT_NAMES[pid]} — 두 손가락으로 크기·위치 · 한 손가락은 스크롤</div>
-            </div>
-            <div style="text-align:center; margin-top:10px;">
-              <button id="confirm" style="background:#2e7d32; color:#fff; border:none;
-                 font-size:16px; font-weight:700; padding:11px 28px; border-radius:10px;
-                 cursor:pointer;">✅ 이 위치로 확정</button>
-              <span id="pos" style="margin-left:10px; color:#666; font-size:13px;"></span>
-            </div>
-            <script>
-            (function(){{
-              const stage=document.getElementById('stage');
-              const plant=document.getElementById('plant');
-              let px={init_x}, py={init_y}, scale={init_s};       // % 단위
-              function apply(){{
-                plant.style.left=px+'%'; plant.style.top=py+'%'; plant.style.width=scale+'%';
-                document.getElementById('pos').textContent =
-                  '좌우 '+Math.round(px)+'% · 상하 '+Math.round(py)+'% · 크기 '+Math.round(scale)+'%';
-              }}
-              function rect(){{ return stage.getBoundingClientRect(); }}
-              let dragging=false, ox=0, oy=0;
-              function startDrag(cx,cy){{ dragging=true; plant.style.cursor='grabbing';
-                const r=rect(); ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
-              function moveDrag(cx,cy){{ if(!dragging)return; const r=rect();
-                px=Math.min(95,Math.max(5,((cx-r.left-ox)/r.width)*100));
-                py=Math.min(95,Math.max(5,((cy-r.top-oy)/r.height)*100)); apply(); }}
-              function endDrag(){{ dragging=false; plant.style.cursor='grab'; }}
-              plant.addEventListener('mousedown',e=>{{startDrag(e.clientX,e.clientY);e.preventDefault();}});
-              window.addEventListener('mousemove',e=>moveDrag(e.clientX,e.clientY));
-              window.addEventListener('mouseup',endDrag);
-              stage.addEventListener('wheel',e=>{{ scale=Math.min(90,Math.max(10,
-                scale - Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
-              let pinchStart=0, scaleStart={init_s}, px0=0, py0=0, mx0=0, my0=0;
-              function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
-                return Math.hypot(dx,dy); }}
-              function mid(t){{ return {{x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}}; }}
-              stage.addEventListener('touchstart',e=>{{
-                if(e.touches.length===2){{                       // 두 손가락: 크기+위치
-                  const r=rect(), m=mid(e.touches);
-                  dragging=false; pinchStart=dist(e.touches); scaleStart=scale;
-                  px0=px; py0=py; mx0=(m.x-r.left)/r.width*100; my0=(m.y-r.top)/r.height*100;
-                  e.preventDefault();
-                }}                                               // 한 손가락은 페이지 스크롤
-              }},{{passive:false}});
-              stage.addEventListener('touchmove',e=>{{
-                if(e.touches.length===2 && pinchStart>0){{
-                  const r=rect(), m=mid(e.touches);
-                  scale=Math.min(90,Math.max(10, scaleStart*(dist(e.touches)/pinchStart)));
-                  const mx=(m.x-r.left)/r.width*100, my=(m.y-r.top)/r.height*100;
-                  px=Math.min(95,Math.max(5, px0+(mx-mx0)));
-                  py=Math.min(95,Math.max(5, py0+(my-my0)));
-                  apply(); e.preventDefault();
-                }}
-              }},{{passive:false}});
-              stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinchStart=0; }} }});
-              // ── 확정: 부모(Streamlit) URL에 값 실어 새로고침 → 서버가 읽어 합성 ──
-              document.getElementById('confirm').addEventListener('click',function(){{
-                const p = window.parent;
-                const url = new URL(p.location.href);
-                url.searchParams.set('mx', Math.round(px));
-                url.searchParams.set('my', Math.round(py));
-                url.searchParams.set('msc', Math.round(scale));
-                p.location.href = url.toString();
-              }});
-              apply();
-            }})();
-            </script>
-            """, height=590)
-
-            # ── 서버: URL 쿼리파라미터로 넘어온 확정값을 읽어 합성 ──
-            qp = st.query_params
-            if "mx" in qp and "my" in qp and "msc" in qp:
-                try:
-                    ss.mx = int(qp["mx"]); ss.my = int(qp["my"]); ss.msc = int(qp["msc"])
-                except ValueError:
-                    pass
-                st.query_params.clear()   # 값 소비 후 URL 정리(무한루프 방지)
-            if "mx" in ss:
-                st.success(f"확정 위치: 좌우 {ss.mx}% · 상하 {ss.my}% · 크기 {ss.msc}%")
-                ss.comp_img = composite_plant(ss.sp_img, pid, ss.mx, ss.my, ss.msc,
-                                              f"{PLANT_NAMES[pid]} 대형 화분")
-                st.image(ss.comp_img, use_container_width=True,
-                         caption="확정한 위치로 합성된 결과 (저장됩니다)")
-        b1, b2, b3 = st.columns(3)
-        b1.button("🔄 식물 변경", use_container_width=True,
+        b1, b2 = st.columns(2)
+        b1.button("🔄 처음 식물 다시 고르기", use_container_width=True,
                   on_click=lambda: ss.update(space_step=2))
         b2.button("🛒 장바구니 담기", use_container_width=True)
-        b3.button("🏺 화분 스타일 (토분/야외용)", use_container_width=True)
-        if st.button("다음", type="primary", use_container_width=True):
+        if st.button("다음 →", type="primary", use_container_width=True):
             ss.space_step = 4; st.rerun()
 
     else:
         pid = ss.sp_pid
+        recs = ss.get("sp_recs") or [pid]
         h = img_hash(ss.sp_img)
         match = ss.get("sp_match", 95 + h % 5)
         st.markdown("<div class='step'>4단계: 나의 최적 식물 & 농원</div>",
                     unsafe_allow_html=True)
         st.markdown(f"<div class='big'>{USER_NAME}님! 이 식물이 당신의 {ss.room}과 "
                     f"{match}% 어울립니다!</div>", unsafe_allow_html=True)
-        pc1, pc2 = st.columns([1, 2])
-        if ss.get("comp_img"):
-            pc1.image(ss.comp_img)
-        else:
-            pc1.image(plant_image(pid, 220, "blue" if pid == "P416" else None))
+
+        # 사진 위에 식물 배치 미리보기 (핀치=크기·위치, 요청 8)
+        place_stage(pid, key="st4")
+        st.markdown("##### 🌿 다른 식물로 바꿔보기 · 탭하면 사진에 올라옵니다")
+        plant_picker(recs, "pick4")
+
         reason = ss.get("sp_reason") or PLANT_DESC.get(
             pid, "이 공간의 채광·규모에 최적화된 추천 식물")
-        pc2.markdown(f"""<div class='result'><b style='font-size:20px'>{PLANT_NAMES[pid]}</b><br>
-            {reason}<br>단지 평균가 / 건강 장수 수명 ⭐ 4.9</div>""", unsafe_allow_html=True)
-
-        # ── 사진 바로 아래: 이 공간에 어울리는 3가지 추천 식물 ──
-        recs = ss.get("sp_recs") or [pid]
-        st.markdown("#### 🌿 이 공간에 어울리는 추천 식물 3가지")
-        rcols = st.columns(3)
-        for col, rp in zip(rcols, recs[:3]):
-            ill = plant_illust(rp)
-            if ill:
-                col.image(_thumb(ill, 240), use_container_width=True)
-            else:
-                col.markdown("<div style='text-align:center;font-size:48px'>🌿</div>",
-                             unsafe_allow_html=True)
-            _mark = " ✅" if rp == pid else ""
-            col.markdown(f"<div style='text-align:center'><b>{PLANT_NAMES[rp]}</b>{_mark}</div>",
-                         unsafe_allow_html=True)
+        st.markdown(f"<div class='result'><b style='font-size:20px'>{PLANT_NAMES[pid]}</b><br>"
+                    f"{reason}<br>단지 평균가 / 건강 장수 수명 ⭐ 4.9</div>",
+                    unsafe_allow_html=True)
 
         st.markdown("#### 이 식물을 가장 잘 키우고 조경 자재를 보유한 농원")
         b = best_nursery(pid, "fun02")
