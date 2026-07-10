@@ -100,7 +100,7 @@ h1,h2,h3 {{ color:{GREEN}; }}
 /* ── 헤더 알림 버튼: 컬럼을 채우는 흰색 둥근 박스 (스크린샷과 동일) ── */
 [data-testid="stPopover"] button {{
     background:#ffffff !important; border:1px solid #e3e3e3 !important;
-    border-radius:16px !important; min-height:60px !important;
+    border-radius:16px !important; min-height:52px !important;
     font-weight:700 !important; color:#2E5D32 !important;
     box-shadow:0 1px 3px rgba(0,0,0,.04) !important;
 }}
@@ -856,16 +856,25 @@ def composite_plant(bg_bytes, pid, x_pct, y_pct, scale_pct, label):
     d.text((x+ps/2-tw/2, y+ps+14), label, font=f, fill=(30, 60, 30))
     return out
 
-def place_stage(pid, key="stage", height=520):
+def place_stage(pid, key="stage", height=None):
     """공간 사진 위에 식물을 얹어, 핀치(크기)·드래그로 실시간 배치해보는 미리보기.
     별도 '확정' 버튼 없이 화면에서 바로 체험한다(2손가락=크기+위치, 1손가락=스크롤)."""
     bg_b64 = base64.b64encode(ss.sp_img).decode()
+    # 사진 실제 비율로 iframe 높이 추정 → 로드 후 JS가 실제 높이에 맞춰 더 조여 빈 공간 제거
+    try:
+        _w, _h = Image.open(io.BytesIO(ss.sp_img)).size
+        _aspect = (_w / _h) if _h else 1.4
+    except Exception:
+        _aspect = 1.4
+    if height is None:                       # 데스크톱 최대폭(640) 기준 + 여유, 모바일은 JS가 조임
+        height = int(min(560, max(180, 640 / _aspect + 24)))
     ill = plant_illust(pid)
     _pi = _white_to_transparent(ill) if ill else \
         draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
     _buf = io.BytesIO(); _pi.save(_buf, "PNG")
     plant_b64 = base64.b64encode(_buf.getvalue()).decode()
     components.html(f"""
+    <style>html,body{{margin:0;padding:0;overflow:hidden;}}</style>
     <div id="{key}" style="position:relative; width:100%; max-width:640px; margin:0 auto;
          touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
          box-shadow:0 2px 10px rgba(0,0,0,.15);">
@@ -913,6 +922,20 @@ def place_stage(pid, key="stage", height=520):
           apply(); e.preventDefault(); }}
       }},{{passive:false}});
       stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
+      // ── iframe 높이를 사진 실제 높이에 맞춰 자동 조정(사진 아래 빈 공간 제거) ──
+      function fitFrame(){{
+        try{{
+          const fh=Math.ceil(stage.getBoundingClientRect().height);
+          if(fh>0 && window.frameElement){{
+            window.frameElement.style.height=fh+'px';
+            window.frameElement.setAttribute('height', fh);
+          }}
+        }}catch(e){{}}
+      }}
+      const _bg=stage.querySelector('img');
+      if(_bg && _bg.complete) fitFrame(); else if(_bg) _bg.addEventListener('load',fitFrame);
+      window.addEventListener('resize',fitFrame);
+      setTimeout(fitFrame,60); setTimeout(fitFrame,300); setTimeout(fitFrame,900);
       apply();
     }})();
     </script>
@@ -1262,7 +1285,7 @@ def header():
         if logo:
             if clickable_image(logo, f"logohome_{page}", aspect="300/96",
                                fit="contain", bg="#EFF1EF", pad="8px 14px",
-                               pos="left center", height="60px", hug=True):
+                               pos="left center", height="50px", hug=True):
                 go("home")
         else:
             if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
@@ -1547,7 +1570,7 @@ elif page == "space":
         # ── 사진 아래: 분석 라인(창문방향…여백) + 종합 추천 지표 (첨부 이미지 순서) ──
         chips = " &nbsp;·&nbsp; ".join(
             f"{e} <b>{t}</b> {s.split('<br>')[0]}" for (e, t, s) in cards)
-        st.markdown(f"<div class='acard' style='text-align:left; font-size:16px; "
+        st.markdown(f"<div class='acard' style='text-align:left; font-size:14px; "
                     f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
         st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
 
