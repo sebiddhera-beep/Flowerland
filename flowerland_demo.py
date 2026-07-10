@@ -1512,7 +1512,7 @@ elif page == "space":
         # ── 분석 카드 4종을 한 줄로 압축 (요청: 한 줄로) ──
         chips = " &nbsp;·&nbsp; ".join(
             f"{e} <b>{t}</b> {s.split('<br>')[0]}" for (e, t, s) in cards)
-        st.markdown(f"<div class='acard' style='text-align:left; font-size:13px; "
+        st.markdown(f"<div class='acard' style='text-align:left; font-size:16px; "
                     f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
         st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
 
