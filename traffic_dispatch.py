@@ -50,8 +50,15 @@ N_NURSERY = 40                      # 불로화훼단지 농원 수(데모)
 ZONES = ["A동", "B동", "C동", "D동", "E동", "노지구역"]
 
 
+# ── 반드시 재고를 넣을 PID(안전장치) ───────────────────────────
+# CSV 로딩이 옛 버전이어도 아래 종은 항상 시드되도록 보장한다.
+#   P657 금목서 · P3002 은목서
+GUARANTEED_PIDS = ["P657", "P3002"]
+
+
 def _load_plant_ids():
-    """마스터 CSV 에서 PID 목록을 읽는다(v3 우선). 없으면 P001만."""
+    """마스터 CSV 에서 PID 목록을 읽는다(v3 우선). 없으면 P001만.
+    GUARANTEED_PIDS 는 누락 시 뒤에 덧붙여 항상 포함한다."""
     ids = []
     try:
         # utf-8-sig: 엑셀 저장(BOM) CSV도 안전하게 읽는다.
@@ -62,7 +69,14 @@ def _load_plant_ids():
                     ids.append(pid)
     except FileNotFoundError:
         pass
-    return ids or ["P001"]
+    if not ids:
+        ids = ["P001"]
+    # 보장 PID 보강(중복 없이)
+    seen = set(ids)
+    for pid in GUARANTEED_PIDS:
+        if pid not in seen:
+            ids.append(pid); seen.add(pid)
+    return ids
 
 
 # ── 스키마 ──────────────────────────────────────────────────────
