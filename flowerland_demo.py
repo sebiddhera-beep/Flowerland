@@ -2002,14 +2002,62 @@ elif page == "map":
     header()
     home_button(page)
     st.markdown("## 🗺️ 농원 지도 (불로화훼단지)")
-    rows = conn.execute("SELECT id, name FROM nursery").fetchall()
-    rng = np.random.RandomState(7)
-    st.map({"lat": 35.9258 + rng.uniform(-0.002, 0.002, len(rows)),
-            "lon": 128.6390 + rng.uniform(-0.003, 0.003, len(rows))},
-           size=8, color="#2E7D32")
-    sel = st.selectbox("농원 선택", [f"{n} ({i}) · {zone_of(i)}" for i, n in rows])
-    st.markdown(f"<div class='nursery'>🌿 <b>{sel}</b><br>영업 09:00~18:00 · 취급: 관엽/다육 "
-                f"· 📞 053-98X-XXXX · 📱 QR 스탬프 입구 부착</div>", unsafe_allow_html=True)
+    try:
+        rows = conn.execute("SELECT id, name, COALESCE(address,''), COALESCE(phone,''), zone "
+                            "FROM nursery ORDER BY id").fetchall()
+    except sqlite3.OperationalError:
+        _ensure_admin_columns(conn)
+        rows = conn.execute("SELECT id, name, COALESCE(address,''), COALESCE(phone,''), zone "
+                            "FROM nursery ORDER BY id").fetchall()
+    if not rows:
+        st.info("등록된 농원이 없습니다.")
+    else:
+        # 농원별 '고정' 좌표(ID 해시 기반) — 재렌더에도 자리가 안 흔들림
+        def _coord(nid):
+            h = int(hashlib.md5(nid.encode()).hexdigest(), 16)
+            return (35.9258 + ((h % 1000) / 1000 - 0.5) * 0.004,
+                    128.6390 + (((h // 997) % 1000) / 1000 - 0.5) * 0.006)
+        info = {i: (n, a, p, z) for i, n, a, p, z in rows}
+
+        # 먼저 선택 → 그 값으로 지도를 그린다(선택이 지도에 반영되도록 순서 중요)
+        sel = st.selectbox("농원 선택", [f"{n} ({i})" for i, n, *_ in rows], key="map_sel")
+        sel_id = sel.split("(")[-1].rstrip(")")
+        slat, slon = _coord(sel_id)
+
+        pts = []
+        for i, n, a, p, z in rows:
+            la, lo = _coord(i)
+            is_sel = (i == sel_id)
+            pts.append({"name": n, "id": i, "lat": la, "lon": lo,
+                        "color": [231, 76, 60] if is_sel else [46, 125, 50],
+                        "rad": 34 if is_sel else 15})
+        try:
+            import pydeck as pdk
+            layer = pdk.Layer(
+                "ScatterplotLayer", data=pts, get_position="[lon, lat]",
+                get_fill_color="color", get_radius="rad",
+                radius_min_pixels=6, radius_max_pixels=40, pickable=True,
+                stroked=True, get_line_color=[255, 255, 255], line_width_min_pixels=1)
+            view = pdk.ViewState(latitude=slat, longitude=slon, zoom=16, pitch=0)
+            st.pydeck_chart(pdk.Deck(
+                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                layers=[layer], initial_view_state=view,
+                tooltip={"text": "{name} ({id})"}), use_container_width=True)
+        except Exception:
+            # pydeck 미지원 환경 폴백: 선택 농원을 빨간 큰 점으로 강조한 기본 지도
+            import pandas as _pd
+            df = _pd.DataFrame({"lat": [p["lat"] for p in pts],
+                                "lon": [p["lon"] for p in pts],
+                                "color": [p["color"] for p in pts],
+                                "size": [p["rad"] for p in pts]})
+            st.map(df, latitude="lat", longitude="lon", color="color", size="size")
+
+        n, a, p, z = info[sel_id]
+        addr = a or f"{z} · 불로화훼단지"
+        tel = f"📞 <a href='tel:{p}' style='color:#e91e63;text-decoration:none;font-weight:700'>{p}</a>" if p else "📞 053-000-0000"
+        st.markdown(f"<div class='nursery'>🌿 <b>{n}</b> ({sel_id})<br>"
+                    f"📍 {addr} · {tel}<br>영업 09:00~18:00 · QR 스탬프 입구 부착</div>",
+                    unsafe_allow_html=True)
 
 # ══════════════ 분갈이 특화 ══════════════
 elif page == "repot":
