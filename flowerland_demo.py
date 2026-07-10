@@ -64,7 +64,7 @@ st.markdown(f"""
                animation:fl-rotate 0.9s linear infinite; }}
 .fl-spin-txt {{ margin-top:14px; color:{GREEN}; font-weight:700; font-size:15px; }}
 @keyframes fl-rotate {{ to {{ transform:rotate(360deg); }} }}
-.block-container {{ max-width: {PC_MAX_WIDTH}; margin: 0 auto; padding-top: 1.0rem; }}
+.block-container {{ max-width: {PC_MAX_WIDTH}; margin: 0 auto; padding-top: 2.4rem; }}
 h1,h2,h3 {{ color:{GREEN}; }}
 .step {{ color:{GREEN}; font-weight:800; font-size:15px; letter-spacing:.3px; }}
 .big  {{ font-size:24px; font-weight:800; line-height:1.35; }}
@@ -195,6 +195,10 @@ with st.sidebar:
                 with st.spinner("Gemini 호출 중..."):
                     r = gm.ask_json(api_key, '{"ok": true} 를 그대로 반환하시오.')
                 st.success(f"연결 정상 ✓ (응답: {r})")
+                # 연결이 정상이면 이전 실패로 꺼둔 식물검색 AI를 다시 켠다
+                st.session_state.plant_ai_off = False
+                for _k in ("plant_ai_notified", "plant_ai_cache", "plant_ai_err"):
+                    st.session_state.pop(_k, None)
             except Exception as e:
                 st.error(f"연결 실패: {type(e).__name__}\n\n{str(e)[:300]}")
                 st.caption("키는 aistudio.google.com 발급분(AIza로 시작)이어야 하며, "
@@ -271,10 +275,12 @@ def greeting_for_gender(gender):
     if g.startswith("m") or "남" in g:
         return GREETING_MALE
     return f"{USER_NAME} 님"          # 성별 불명 → 기존 기본 인사말
-INDOOR_RECS  = {"거실": ["P001", "P004", "P227"], "침실": ["P008", "P002", "P005"],
-                "사무실": ["P006", "P002", "P008"]}
-OUTDOOR_RECS = {"베란다": ["P010", "P365", "P241"], "정원": ["P416", "P591", "P752"],
-                "테라스": ["P416", "P011", "P752"]}
+INDOOR_RECS  = {"거실": ["P001", "P004", "P227", "P002", "P006"],
+                "침실": ["P008", "P002", "P005", "P001", "P227"],
+                "사무실": ["P006", "P002", "P008", "P001", "P005"]}
+OUTDOOR_RECS = {"베란다": ["P010", "P365", "P241", "P011", "P591"],
+                "정원": ["P416", "P591", "P752", "P010", "P241"],
+                "테라스": ["P416", "P011", "P752", "P365", "P591"]}
 DIAG_CLASSES = [
     ("과습", "물주기를 절반으로 줄이고 배수 구멍 확인. 겉흙 3cm 마른 뒤 관수"),
     ("건조", "즉시 저면관수 30분. 이후 주 1~2회 규칙 관수로 전환"),
@@ -318,6 +324,10 @@ def _ensure_admin_columns(conn):
         conn.execute("ALTER TABLE nursery ADD COLUMN tagline TEXT DEFAULT ''")
     if "specialty" not in ncols:
         conn.execute("ALTER TABLE nursery ADD COLUMN specialty TEXT DEFAULT ''")
+    if "address" not in ncols:
+        conn.execute("ALTER TABLE nursery ADD COLUMN address TEXT DEFAULT ''")
+    if "phone" not in ncols:
+        conn.execute("ALTER TABLE nursery ADD COLUMN phone TEXT DEFAULT ''")
     scols = [r[1] for r in conn.execute("PRAGMA table_info(stock)").fetchall()]
     if "price_min" not in scols:
         conn.execute("ALTER TABLE stock ADD COLUMN price_min INTEGER DEFAULT 0")
@@ -337,33 +347,144 @@ def best_nursery(pid, source):
     if not ids:
         return None
     nid = ids[0]
-    name = conn.execute("SELECT name FROM nursery WHERE id=?", (nid,)).fetchone()[0]
+    try:
+        row = conn.execute("SELECT name, COALESCE(address,''), COALESCE(phone,'') "
+                           "FROM nursery WHERE id=?", (nid,)).fetchone()
+    except sqlite3.OperationalError:      # 컬럼 없음 → 마이그레이션 후 재시도
+        _ensure_admin_columns(conn)
+        row = conn.execute("SELECT name, COALESCE(address,''), COALESCE(phone,'') "
+                           "FROM nursery WHERE id=?", (nid,)).fetchone()
+    name, address, phone = row
     qty = conn.execute("SELECT qty FROM stock WHERE nursery_id=? AND plant_id=?",
                        (nid, pid)).fetchone()
-    return {"id": nid, "name": name, "zone": zone_of(nid),
-            "qty": qty[0] if qty else 0,
+    return {"id": nid, "name": name, "address": address, "phone": phone,
+            "zone": zone_of(nid), "qty": qty[0] if qty else 0,
             "recs": 2800 + int(hashlib.md5(nid.encode()).hexdigest(), 16) % 900}
 
-def kakao_map_url(nursery_name):
-    """농원 이름 + 불로화훼단지 주소로 카카오맵 검색 링크 생성.
-    좌표(위경도) 없이도 동작. 앱 없어도 브라우저에서 열림.
-    나중에 nursery 테이블에 lat/lng 컬럼을 넣으면
-    https://map.kakao.com/link/to/{이름},{위도},{경도} 방식으로 교체 가능."""
-    q = urllib.parse.quote(f"{nursery_name} 대구 동구 불로동 화훼단지")
+def _next_nursery_id():
+    """기존 최대 번호 다음의 농원ID(N### 형식)를 반환."""
+    ids = [r[0] for r in conn.execute("SELECT id FROM nursery").fetchall()]
+    nums = [int(i[1:]) for i in ids if len(i) > 1 and i[1:].isdigit()]
+    return f"N{(max(nums) + 1) if nums else 1:03d}"
+
+def _csv_int(v, default=0):
+    try:
+        return int(float(str(v).replace(",", "").strip()))
+    except (ValueError, TypeError):
+        return default
+
+def parse_nurseries_csv(file_bytes):
+    """CSV를 파싱만 한다(DB 반영 없음). 미리보기·검증용.
+    반환: {'nurseries': {...}, 'stocks': {...}, 'warnings': [...],
+           'headers': [...], 'encoding': str, 'delimiter': str}"""
+    import io as _io, csv as _csv
+    # 인코딩 자동 감지: 엑셀(UTF-8 BOM) / 한글 윈도우(CP949·EUC-KR) 모두 지원
+    text, used_enc = None, "?"
+    for enc in ("utf-8-sig", "cp949", "euc-kr", "utf-8"):
+        try:
+            text = file_bytes.decode(enc)
+            used_enc = enc
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if text is None:
+        text = file_bytes.decode("utf-8", errors="replace"); used_enc = "utf-8(강제)"
+    # 엑셀이 넣는 'sep=,' 첫 줄 제거
+    lines = text.splitlines()
+    if lines and lines[0].lower().startswith("sep="):
+        lines = lines[1:]; text = "\n".join(lines)
+    first = next((ln for ln in lines if ln.strip()), "")
+    delim = max([",", ";", "\t"], key=first.count) if first else ","
+    reader = _csv.DictReader(_io.StringIO(text), delimiter=delim)
+
+    def g(row, *names):
+        for k, val in row.items():
+            if k and k.strip().lstrip("\ufeff") in names:
+                return (val or "").strip()
+        return ""
+
+    nurseries, stocks, warns = {}, {}, []
+    for i, row in enumerate(reader, start=2):
+        name = g(row, "농원명", "name")
+        nid = g(row, "농원ID", "id", "nursery_id")
+        if not name and not nid:
+            continue
+        if not nid:
+            nid = f"U{len(nurseries) + 1:03d}"
+        nurseries[nid] = (name or nid, g(row, "구역", "zone") or "A동",
+                          g(row, "PIN", "pin"), g(row, "소개문구", "tagline"),
+                          g(row, "전문분야", "specialty"), g(row, "주소", "address"),
+                          g(row, "대표전화", "전화번호", "phone"))
+        pname = g(row, "취급식물명", "식물명", "plant_name")
+        ppid = g(row, "취급식물ID", "식물ID", "plant_id")
+        if pname or ppid:
+            pid = ppid if ppid in PLANT_NAMES else NAME_TO_PID.get(pname)
+            if not pid:
+                warns.append(f"{i}행: 식물 '{pname or ppid}'을(를) 카탈로그에서 못 찾아 건너뜀")
+            else:
+                stocks[(nid, pid)] = (_csv_int(g(row, "재고수량", "qty")),
+                                      _csv_int(g(row, "최저가", "price_min")),
+                                      _csv_int(g(row, "최고가", "price_max")))
+    return {"nurseries": nurseries, "stocks": stocks, "warnings": warns,
+            "headers": [h.lstrip("\ufeff") for h in (reader.fieldnames or [])],
+            "encoding": used_enc, "delimiter": {",": "쉼표", ";": "세미콜론", "\t": "탭"}[delim]}
+
+def import_nurseries_csv(file_bytes, replace=False, parsed=None):
+    """CSV(농원+취급식물)를 nursery/stock 테이블에 반영.
+    parsed가 주어지면(미리보기 재사용) 파싱을 건너뛴다.
+    반환: {'nurseries': n, 'stocks': m, 'warnings': [...]}"""
+    p = parsed or parse_nurseries_csv(file_bytes)
+    nurseries, stocks, warns = p["nurseries"], p["stocks"], list(p["warnings"])
+
+    if not nurseries:
+        warns.append(f"등록된 농원이 없습니다. 인식된 헤더: [{', '.join(p['headers'])}]. "
+                     "'농원명'/'농원ID' 열이 있는지 확인하세요.")
+
+    if replace:
+        conn.execute("DELETE FROM stock")
+        conn.execute("DELETE FROM nursery")
+        conn.execute("DELETE FROM dispatch_log")
+    _ensure_admin_columns(conn)   # 주소·전화 컬럼 보장(구 DB 방어)
+    for nid, (name, zone, pin, tagline, specialty, address, phone) in nurseries.items():
+        conn.execute(
+            "INSERT INTO nursery(id,name,zone,pin,tagline,specialty,address,phone) "
+            "VALUES(?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(id) DO UPDATE SET name=excluded.name, zone=excluded.zone, "
+            "pin=excluded.pin, tagline=excluded.tagline, specialty=excluded.specialty, "
+            "address=excluded.address, phone=excluded.phone",
+            (nid, name, zone, pin, tagline, specialty, address, phone))
+    upd = datetime.now().strftime("%Y-%m")
+    for (nid, pid), (qty, pmin, pmax) in stocks.items():
+        conn.execute(
+            "INSERT INTO stock(nursery_id,plant_id,qty,price_min,price_max,updated_at) "
+            "VALUES(?,?,?,?,?,?) ON CONFLICT(nursery_id,plant_id) DO UPDATE SET "
+            "qty=excluded.qty, price_min=excluded.price_min, "
+            "price_max=excluded.price_max, updated_at=excluded.updated_at",
+            (nid, pid, qty, pmin, pmax, upd))
+    conn.commit()
+    return {"nurseries": len(nurseries), "stocks": len(stocks), "warnings": warns}
+
+def kakao_map_url(nursery_name, address=""):
+    """농원 주소(있으면) 또는 이름+불로화훼단지로 카카오맵 검색 링크 생성.
+    좌표(위경도) 없이도 동작. 앱 없어도 브라우저에서 열림."""
+    q = urllib.parse.quote((address or "").strip()
+                           or f"{nursery_name} 대구 동구 불로동 화훼단지")
     return f"https://map.kakao.com/?q={q}"
 
 def best_card(b, pid):
+    _loc = b.get("address") or f"{b['zone']}"
+    _tel = f"<br>📞 대표전화: {b['phone']}" if b.get("phone") else ""
     st.markdown(f"""<div class='best'>
       <span class='tag'>최우수 매칭 농원</span><br>
       <b style='font-size:19px'>🌿 {b['name']}</b> <span style='color:#777'>({b['id']})</span><br>
       <span style='font-size:14px'>
       ✅ 전문성: {PLANT_NAMES.get(pid, pid)} 재배 우수<br>
-      📍 위치: {b['zone']} (지도 보기)<br>
+      📍 위치: {_loc} (지도 보기){_tel}<br>
       🎁 특별 서비스: 현장 화분 매칭 및 무료 분갈이 가능<br>
       👍 추천 횟수: {b['recs']:,}+ · 재고 {b['qty']}개</span></div>""",
       unsafe_allow_html=True)
     # 카카오맵 길안내: st.button은 링크를 못 열므로 a태그 버튼으로 표시
-    kurl = kakao_map_url(b['name'])
+    kurl = kakao_map_url(b['name'], b.get('address', ''))
     st.markdown(f"""
     <a href="{kurl}" target="_blank" style="
         display:block; text-align:center; text-decoration:none;
@@ -398,19 +519,20 @@ def _b64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-def clickable_image(path, key, aspect="351/416", fit="100% 100%"):
+def clickable_image(path, key, aspect="351/416", fit="100% 100%", frame=True):
     """이미지 전체가 버튼으로 동작. 클릭하면 True 반환 (세션 유지됨).
-    fit="contain"이면 종횡비를 유지한 채 카드 안에 맞춤 (TOP5 일러스트용)."""
+    fit="contain"이면 종횡비를 유지한 채 카드 안에 맞춤 (TOP5 일러스트용).
+    frame=False면 테두리·배경 없이 이미지만 (로고 등 여백 제거용)."""
+    box = ("border-radius: 16px; border: 1px solid #e3e3e3;" if frame
+           else "border: none; background-color: transparent;")
+    hov = ("border-color: {g}; box-shadow: 0 3px 12px rgba(46,125,50,.30); "
+           "transform: translateY(-1px);".format(g=GREEN) if frame else "opacity: .82;")
     st.markdown(f"""<style>
     .st-key-{key} button {{
         background: url("data:image/png;base64,{_b64(path)}") center / {fit} no-repeat;
-        width: 100%; aspect-ratio: {aspect}; height: auto;
-        border-radius: 16px; border: 1px solid #e3e3e3;
+        width: 100%; aspect-ratio: {aspect}; height: auto; {box}
     }}
-    .st-key-{key} button:hover {{
-        border-color: {GREEN}; box-shadow: 0 3px 12px rgba(46,125,50,.30);
-        transform: translateY(-1px); transition: all .15s;
-    }}
+    .st-key-{key} button:hover {{ {hov} transition: all .15s; }}
     .st-key-{key} button p, .st-key-{key} button div {{ color: transparent !important; }}
     </style>""", unsafe_allow_html=True)
     return st.button("\u200b", key=key, use_container_width=True)
@@ -530,15 +652,21 @@ def plant_image(pid, size=380, flower=None):
             pass
     return draw_plant(size, flower)
 
-def draw_plant(size=300, flower=None):
-    """화분+식물 일러스트 (flower='blue'면 수국 스타일)"""
+POT_STYLES = {
+    "토분":             ((193, 121, 82), (210, 140, 100), (150, 90, 60)),
+    "플라스틱(화이트)": ((236, 236, 238), (247, 247, 249), (186, 186, 190)),
+    "야외용(다크)":     ((92, 98, 104), (112, 118, 124), (62, 66, 72)),
+}
+def draw_plant(size=300, flower=None, pot=None):
+    """화분+식물 일러스트 (flower='blue'면 수국 스타일, pot으로 화분 색 변경)"""
     im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     s = size / 300.0
+    body, rim, line = POT_STYLES.get(pot, POT_STYLES["토분"])
     # 화분
     d.polygon([(105*s, 210*s), (195*s, 210*s), (180*s, 285*s), (120*s, 285*s)],
-              fill=(193, 121, 82, 255), outline=(150, 90, 60, 255), width=int(3*s))
-    d.rectangle([98*s, 200*s, 202*s, 216*s], fill=(210, 140, 100, 255))
+              fill=body + (255,), outline=line + (255,), width=int(3*s))
+    d.rectangle([98*s, 200*s, 202*s, 216*s], fill=rim + (255,))
     # 줄기
     d.line([(150*s, 210*s), (150*s, 110*s)], fill=(60, 120, 60, 255), width=int(7*s))
     if flower == "blue":  # 수국
@@ -633,75 +761,6 @@ def make_qr(text, size=140):
                 d.rectangle([i*c, j*c, (i+1)*c, (j+1)*c], fill="black")
     return im
 
-def _fit_font(draw, text, max_w, start=46, floor=26):
-    """text가 max_w 폭에 들어가도록 폰트 크기를 자동 축소해 반환."""
-    sz = start
-    while sz > floor:
-        f = find_font(sz)
-        if draw.textlength(text, font=f) <= max_w:
-            return f
-        sz -= 2
-    return find_font(floor)
-
-def share_card(img_bytes, pid, copy_text, score, greeting=None, pos=None):
-    """공유 카드 PNG 생성.
-    greeting : 상단 인사말(성별 맞춤). None이면 기본 '{USER_NAME} 님'.
-    pos=None          : 기존 좌우 배치(셀카 | 식물 일러스트).
-    pos=(x%,y%,크기%) : 셀카를 배경으로 깔고 그 위에 식물을 해당 위치·크기로
-                        오버레이한다(공간 3단계 '가상 배치'와 동일한 % 좌표계)."""
-    if greeting is None:
-        greeting = f"{USER_NAME} 님"
-    W, H = 840, 1030
-    card = Image.new("RGBA", (W, H), (232, 245, 233, 255))
-    d = ImageDraw.Draw(card)
-    d.rectangle([0, 0, W, 110], fill=(46, 125, 50, 255))
-    d.text((30, 30), "🌱 Flower Land (플라워랜드)", font=find_font(40), fill="white")
-
-    if pos is None:
-        # ── 기존 좌우 비대칭 배치 (셀카는 기존 크기, 식물은 더 크게) ──
-        SELF_PS, PLANT_PS, y_top = 360, 520, 150
-        _pl = plant_image(pid, PLANT_PS, "blue" if pid == "P416" else None)
-        card.paste(_pl, (W - PLANT_PS - 15, y_top), _pl)
-        ph = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-        side = min(ph.size)
-        ph = ph.crop(((ph.width-side)//2, (ph.height-side)//2,
-                      (ph.width+side)//2, (ph.height+side)//2)).resize((SELF_PS, SELF_PS))
-        card.paste(ph, (25, y_top + (PLANT_PS - SELF_PS) // 2))
-        ty = y_top + PLANT_PS + 45
-    else:
-        # ── 셀카 배경 + 식물 오버레이(위치·크기 조정 반영) ──
-        x_pct, y_pct, scale_pct = pos
-        PHOTO_TOP, PHOTO_H, PHOTO_W = 130, 620, W - 50
-        ph = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-        # 배치 영역을 'cover'로 채우기(중앙 크롭)
-        tr = PHOTO_W / PHOTO_H
-        pr = ph.width / ph.height
-        if pr > tr:                                 # 사진이 더 넓음 → 좌우 크롭
-            nw = int(ph.height * tr)
-            ph = ph.crop(((ph.width-nw)//2, 0, (ph.width+nw)//2, ph.height))
-        else:                                       # 사진이 더 높음 → 상하 크롭
-            nh = int(ph.width / tr)
-            ph = ph.crop((0, (ph.height-nh)//2, ph.width, (ph.height+nh)//2))
-        photo = ph.resize((PHOTO_W, PHOTO_H), Image.LANCZOS).convert("RGBA")
-        # 식물 오버레이 (composite_plant과 동일한 % 좌표계)
-        pl_ps = max(40, int(min(PHOTO_W, PHOTO_H) * scale_pct / 100))
-        pl = plant_image(pid, pl_ps, "blue" if pid == "P416" else None)
-        px = int(PHOTO_W * x_pct / 100 - pl_ps/2)
-        py = int(PHOTO_H * y_pct / 100 - pl_ps/2)
-        photo.paste(pl, (px, py), pl)     # paste는 음수 좌표(가장자리) 허용
-        card.paste(photo, (25, PHOTO_TOP), photo)
-        ty = PHOTO_TOP + PHOTO_H + 28
-
-    f_mid = find_font(30)
-    line1 = f"{greeting} & {PLANT_NAMES[pid]} :"
-    d.text((35, ty), line1, font=_fit_font(d, line1, W - 70, 46, 28), fill=(27, 60, 30))
-    d.text((35, ty + 62), copy_text,
-           font=_fit_font(d, copy_text, W - 70, 46, 28), fill=(27, 60, 30))
-    d.text((35, ty + 150), f"매핑 점수 {score}%  ·  나와 닮은 반려식물 카드",
-           font=f_mid, fill=(90, 110, 90))
-    d.rectangle([0, H-40, W, H], fill=(46, 125, 50, 255))
-    return card
-
 def composite_plant(bg_bytes, pid, x_pct, y_pct, scale_pct, label):
     """3단계 가상 배치: 공간 사진 위 식물 합성"""
     bg = Image.open(io.BytesIO(bg_bytes)).convert("RGBA")
@@ -722,103 +781,273 @@ def composite_plant(bg_bytes, pid, x_pct, y_pct, scale_pct, label):
     d.text((x+ps/2-tw/2, y+ps+14), label, font=f, fill=(30, 60, 30))
     return out
 
-def interactive_place(bg_bytes, pid, init_x, init_y, init_s, prefix, height=590):
-    """식물을 배경 사진 위에 드래그(이동)·핀치/휠(크기)로 배치하는 공용 컴포넌트.
-    공간 3단계 '가상 배치'와 얼굴 매칭이 동일한 조작 방식을 쓰도록 분리한 함수.
-    prefix : 페이지별 쿼리파라미터 접두사('m'=공간, 'f'=얼굴)로 값 충돌 방지.
-    반환   : '확정' 누른 직후 (x%, y%, 크기%) 튜플, 그 외에는 None."""
-    bg_b64 = base64.b64encode(bg_bytes).decode()
+def place_stage(pid, key="stage", height=520):
+    """공간 사진 위에 식물을 얹어, 핀치(크기)·드래그로 실시간 배치해보는 미리보기.
+    별도 '확정' 버튼 없이 화면에서 바로 체험한다(2손가락=크기+위치, 1손가락=스크롤)."""
+    bg_b64 = base64.b64encode(ss.sp_img).decode()
     ill = plant_illust(pid)
-    if ill:
-        _pi = _white_to_transparent(ill)          # 흰 배경 투명 처리
-        _buf = io.BytesIO(); _pi.save(_buf, "PNG")
-        plant_b64 = base64.b64encode(_buf.getvalue()).decode()
-    else:
-        _pl = draw_plant(400, "blue" if pid == "P416" else None)
-        _buf = io.BytesIO(); _pl.save(_buf, "PNG")
-        plant_b64 = base64.b64encode(_buf.getvalue()).decode()
-    kx, ky, ks = f"{prefix}x", f"{prefix}y", f"{prefix}sc"
+    _pi = _white_to_transparent(ill) if ill else \
+        draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
+    _buf = io.BytesIO(); _pi.save(_buf, "PNG")
+    plant_b64 = base64.b64encode(_buf.getvalue()).decode()
     components.html(f"""
-    <div id="stage" style="position:relative; width:100%; max-width:700px;
-         margin:0 auto; touch-action:none; user-select:none; border-radius:12px;
-         overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.15);">
-      <img id="bg" src="data:image/jpeg;base64,{bg_b64}"
+    <div id="{key}" style="position:relative; width:100%; max-width:640px; margin:0 auto;
+         touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
+         box-shadow:0 2px 10px rgba(0,0,0,.15);">
+      <img src="data:image/jpeg;base64,{bg_b64}"
            style="width:100%; display:block; pointer-events:none;">
-      <img id="plant" src="data:image/png;base64,{plant_b64}"
-           style="position:absolute; left:{init_x}%; top:{init_y}%; width:{init_s}%;
+      <img id="{key}_p" src="data:image/png;base64,{plant_b64}"
+           style="position:absolute; left:60%; top:62%; width:40%; height:auto;
                   transform:translate(-50%,-50%); cursor:grab;
                   filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));">
       <div style="position:absolute; left:8px; bottom:8px; background:rgba(46,125,50,.85);
            color:#fff; font-size:12px; padding:3px 9px; border-radius:8px;">
-        {PLANT_NAMES[pid]} — 끌어서 이동 · 두 손가락/휠로 크기</div>
-    </div>
-    <div style="text-align:center; margin-top:10px;">
-      <button id="confirm" style="background:#2e7d32; color:#fff; border:none;
-         font-size:16px; font-weight:700; padding:11px 28px; border-radius:10px;
-         cursor:pointer;">✅ 이 위치로 확정</button>
-      <span id="pos" style="margin-left:10px; color:#666; font-size:13px;"></span>
+        {PLANT_NAMES.get(pid,'')} — 두 손가락으로 크기·위치 · 한 손가락은 스크롤</div>
     </div>
     <script>
     (function(){{
-      const stage=document.getElementById('stage');
-      const plant=document.getElementById('plant');
-      let px={init_x}, py={init_y}, scale={init_s};       // % 단위
-      function apply(){{
-        plant.style.left=px+'%'; plant.style.top=py+'%'; plant.style.width=scale+'%';
-        document.getElementById('pos').textContent =
-          '좌우 '+Math.round(px)+'% · 상하 '+Math.round(py)+'% · 크기 '+Math.round(scale)+'%';
-      }}
+      const stage=document.getElementById('{key}'), plant=document.getElementById('{key}_p');
+      let px=60, py=62, scale=40, dragging=false, ox=0, oy=0;
+      function apply(){{ plant.style.left=px+'%'; plant.style.top=py+'%'; plant.style.width=scale+'%'; }}
       function rect(){{ return stage.getBoundingClientRect(); }}
-      let dragging=false, ox=0, oy=0;
-      function startDrag(cx,cy){{ dragging=true; plant.style.cursor='grabbing';
-        const r=rect(); ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
-      function moveDrag(cx,cy){{ if(!dragging)return; const r=rect();
+      function sd(cx,cy){{ dragging=true; plant.style.cursor='grabbing'; const r=rect();
+        ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
+      function mv(cx,cy){{ if(!dragging)return; const r=rect();
         px=Math.min(95,Math.max(5,((cx-r.left-ox)/r.width)*100));
         py=Math.min(95,Math.max(5,((cy-r.top-oy)/r.height)*100)); apply(); }}
-      function endDrag(){{ dragging=false; plant.style.cursor='grab'; }}
-      plant.addEventListener('mousedown',e=>{{startDrag(e.clientX,e.clientY);e.preventDefault();}});
-      window.addEventListener('mousemove',e=>moveDrag(e.clientX,e.clientY));
-      window.addEventListener('mouseup',endDrag);
+      function ed(){{ dragging=false; plant.style.cursor='grab'; }}
+      plant.addEventListener('mousedown',e=>{{sd(e.clientX,e.clientY);e.preventDefault();}});
+      window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));
+      window.addEventListener('mouseup',ed);
       stage.addEventListener('wheel',e=>{{ scale=Math.min(90,Math.max(10,
-        scale - Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
-      let pinchStart=0, scaleStart={init_s};
-      function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
-        return Math.hypot(dx,dy); }}
+        scale-Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
+      let pinch=0, s0=40, px0=0, py0=0, mx0=0, my0=0;
+      function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY; return Math.hypot(dx,dy); }}
+      function mid(t){{ return {{x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}}; }}
       stage.addEventListener('touchstart',e=>{{
-        if(e.touches.length===1){{ startDrag(e.touches[0].clientX,e.touches[0].clientY); }}
-        else if(e.touches.length===2){{ dragging=false; pinchStart=dist(e.touches);
-          scaleStart=scale; }}
-        e.preventDefault();
+        if(e.touches.length===2){{ const r=rect(), m=mid(e.touches);
+          dragging=false; pinch=dist(e.touches); s0=scale;
+          px0=px; py0=py; mx0=(m.x-r.left)/r.width*100; my0=(m.y-r.top)/r.height*100;
+          e.preventDefault(); }}
       }},{{passive:false}});
       stage.addEventListener('touchmove',e=>{{
-        if(e.touches.length===1){{ moveDrag(e.touches[0].clientX,e.touches[0].clientY); }}
-        else if(e.touches.length===2 && pinchStart>0){{
-          scale=Math.min(90,Math.max(10, scaleStart*(dist(e.touches)/pinchStart))); apply(); }}
-        e.preventDefault();
+        if(e.touches.length===2 && pinch>0){{ const r=rect(), m=mid(e.touches);
+          scale=Math.min(90,Math.max(10, s0*(dist(e.touches)/pinch)));
+          const mx=(m.x-r.left)/r.width*100, my=(m.y-r.top)/r.height*100;
+          px=Math.min(95,Math.max(5, px0+(mx-mx0))); py=Math.min(95,Math.max(5, py0+(my-my0)));
+          apply(); e.preventDefault(); }}
       }},{{passive:false}});
-      stage.addEventListener('touchend',e=>{{ if(e.touches.length===0){{endDrag();pinchStart=0;}} }});
-      // ── 확정: 부모(Streamlit) URL에 값 실어 새로고침 → 서버가 읽어 합성 ──
-      document.getElementById('confirm').addEventListener('click',function(){{
-        const p = window.parent;
-        const url = new URL(p.location.href);
-        url.searchParams.set('{kx}', Math.round(px));
-        url.searchParams.set('{ky}', Math.round(py));
-        url.searchParams.set('{ks}', Math.round(scale));
-        p.location.href = url.toString();
-      }});
+      stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
       apply();
     }})();
     </script>
     """, height=height)
-    qp = st.query_params
-    if kx in qp and ky in qp and ks in qp:
-        try:
-            out = (int(qp[kx]), int(qp[ky]), int(qp[ks]))
-        except ValueError:
-            out = None
-        st.query_params.clear()      # 값 소비 후 URL 정리(무한 새로고침 방지)
-        return out
-    return None
+
+def plant_picker(recs, key):
+    """추천 식물 타일(가로 나열). 탭하면 선택되어 색이 진해지고 ss.sp_pid가 바뀌며,
+    사진(배치 스테이지)에 즉시 반영된다."""
+    sel = ss.get("sp_pid")
+    if sel not in recs:
+        sel = recs[0]; ss.sp_pid = sel
+    cols = st.columns(len(recs))
+    for col, rp in zip(cols, recs):
+        with col:
+            ill = plant_illust(rp)
+            if ill:
+                st.image(_thumb(ill, 200), use_container_width=True)
+            else:
+                st.markdown("<div style='text-align:center;font-size:36px'>🌿</div>",
+                            unsafe_allow_html=True)
+            if st.button(("✅ " if rp == sel else "") + PLANT_NAMES[rp],
+                         key=f"{key}_{rp}", use_container_width=True,
+                         type="primary" if rp == sel else "secondary"):
+                ss.sp_pid = rp; st.rerun()
+    return sel
+
+def interactive_card(img_bytes, pid, copy_text, score, greeting,
+                     init_x=72, init_y=50, init_s=44):
+    """공유 카드 자체를 조작 가능한 HTML로 렌더한다.
+    별도 편집 화면 없이, 카드 위에서 식물을 바로 끌어 옮기고(드래그)
+    두 손가락/휠로 크기를 조절하며, 카드 전체를 PNG로 저장한다.
+    한글은 브라우저 폰트로 렌더되어 폰트 파일 없이도 깨지지 않는다."""
+    # 셀카를 정사각으로 크롭(브라우저 object-fit 의존 없이 정사각 소스 사용)
+    ph = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    side = min(ph.size)
+    ph = ph.crop(((ph.width-side)//2, (ph.height-side)//2,
+                  (ph.width+side)//2, (ph.height+side)//2)).resize((440, 440))
+    _b = io.BytesIO(); ph.save(_b, "JPEG", quality=88)
+    selfie_b64 = base64.b64encode(_b.getvalue()).decode()
+    # 식물 일러스트(흰 배경 투명)
+    ill = plant_illust(pid)
+    if ill:
+        _pi = _white_to_transparent(ill); _bb = io.BytesIO(); _pi.save(_bb, "PNG")
+    else:
+        _pl = draw_plant(400, "blue" if pid == "P416" else None)
+        _bb = io.BytesIO(); _pl.save(_bb, "PNG")
+    plant_b64 = base64.b64encode(_bb.getvalue()).decode()
+    pname = PLANT_NAMES.get(pid, pid)
+    fname = f"flowerland_{pname}.png"
+    components.html(f"""
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <div id="card" style="width:100%; max-width:430px; margin:0 auto; background:#e8f5e9;
+         border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.18);
+         font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;">
+      <div style="background:#2E7D32; color:#fff; padding:14px 18px; font-size:19px; font-weight:800;">
+        🌱 Flower Land (플라워랜드)</div>
+      <div id="canvas" style="position:relative; width:100%; height:300px; background:#e8f5e9;
+           touch-action:pan-y; user-select:none; overflow:hidden;">
+        <img id="selfie" src="data:image/jpeg;base64,{selfie_b64}"
+             style="position:absolute; left:5%; top:50%; transform:translateY(-50%);
+                    width:40%; height:auto; border-radius:6px; pointer-events:none;">
+        <img id="plant" src="data:image/png;base64,{plant_b64}"
+             style="position:absolute; left:{init_x}%; top:{init_y}%; width:{init_s}%; height:auto;
+                    transform:translate(-50%,-50%); cursor:grab;
+                    filter:drop-shadow(0 6px 10px rgba(0,0,0,.28));">
+      </div>
+      <div style="padding:14px 18px 18px;">
+        <div style="font-size:20px; font-weight:800; color:#173d1b; line-height:1.35;">
+           {greeting} &amp; {pname} :</div>
+        <div style="font-size:20px; font-weight:800; color:#173d1b; line-height:1.35;">{copy_text}</div>
+        <div style="font-size:13px; color:#5a6e5a; margin-top:10px;">
+           매핑 점수 {score}% · 나와 닮은 반려식물 카드</div>
+      </div>
+      <div style="background:#2E7D32; height:14px;"></div>
+    </div>
+    <div style="text-align:center; margin-top:12px;
+                font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;">
+      <button id="save" style="background:#ff5a5f; color:#fff; border:none; width:100%; max-width:430px;
+         font-size:17px; font-weight:800; padding:13px; border-radius:12px; cursor:pointer;">
+         📤 결과 공유하기 (카드 PNG 저장)</button>
+      <div style="color:#888; font-size:12px; margin-top:7px;">
+         ✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 &nbsp;(PC: 드래그 이동·휠 크기)</div>
+    </div>
+    <script>
+    (function(){{
+      const canvas=document.getElementById('canvas');
+      const plant=document.getElementById('plant');
+      let px={init_x}, py={init_y}, scale={init_s};
+      function apply(){{ plant.style.left=px+'%'; plant.style.top=py+'%'; plant.style.width=scale+'%'; }}
+      function rect(){{ return canvas.getBoundingClientRect(); }}
+      let dragging=false, ox=0, oy=0;
+      function sd(cx,cy){{ dragging=true; plant.style.cursor='grabbing'; const r=rect();
+        ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
+      function mv(cx,cy){{ if(!dragging)return; const r=rect();
+        px=Math.min(98,Math.max(2,((cx-r.left-ox)/r.width)*100));
+        py=Math.min(98,Math.max(2,((cy-r.top-oy)/r.height)*100)); apply(); }}
+      function ed(){{ dragging=false; plant.style.cursor='grab'; }}
+      plant.addEventListener('mousedown',e=>{{sd(e.clientX,e.clientY);e.preventDefault();}});
+      window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));
+      window.addEventListener('mouseup',ed);
+      canvas.addEventListener('wheel',e=>{{ scale=Math.min(95,Math.max(12,
+        scale-Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
+      let pinch=0, s0={init_s}, px0=0, py0=0, mx0=0, my0=0;
+      function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+        return Math.hypot(dx,dy); }}
+      function mid(t){{ return {{x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}}; }}
+      canvas.addEventListener('touchstart',e=>{{
+        if(e.touches.length===2){{                          // 두 손가락: 크기+위치 조작
+          const r=rect(), m=mid(e.touches);
+          dragging=false; pinch=dist(e.touches); s0=scale;
+          px0=px; py0=py; mx0=(m.x-r.left)/r.width*100; my0=(m.y-r.top)/r.height*100;
+          e.preventDefault();
+        }}                                                  // 한 손가락은 가로채지 않음 → 페이지 스크롤
+      }},{{passive:false}});
+      canvas.addEventListener('touchmove',e=>{{
+        if(e.touches.length===2 && pinch>0){{
+          const r=rect(), m=mid(e.touches);
+          scale=Math.min(95,Math.max(12, s0*(dist(e.touches)/pinch)));
+          const mx=(m.x-r.left)/r.width*100, my=(m.y-r.top)/r.height*100;
+          px=Math.min(98,Math.max(2, px0+(mx-mx0)));
+          py=Math.min(98,Math.max(2, py0+(my-my0)));
+          apply(); e.preventDefault();
+        }}                                                  // 한 손가락은 스크롤
+      }},{{passive:false}});
+      canvas.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
+      apply();
+      document.getElementById('save').addEventListener('click',function(){{
+        const btn=document.getElementById('save'); btn.textContent='⏳ 카드 생성 중...';
+        html2canvas(document.getElementById('card'),
+          {{backgroundColor:'#e8f5e9', scale:2, useCORS:true}}).then(function(cv){{
+          cv.toBlob(function(blob){{
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement('a'); a.href=url; a.download='{fname}';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(()=>URL.revokeObjectURL(url),5000);
+            btn.textContent='📤 결과 공유하기 (카드 PNG 저장)';
+          }}, 'image/png');
+        }}).catch(function(err){{
+          btn.textContent='📤 결과 공유하기 (카드 PNG 저장)';
+          alert('이미지 저장 중 문제가 발생했습니다. 화면을 캡처해 주세요.');
+        }});
+      }});
+    }})();
+    </script>
+    """, height=560)
+
+def pinch_image(pid, init_size=62, height=340):
+    """DB(카탈로그) 식물 이미지를 핀치/휠로 크기 조절 + 드래그로 이동해서 보는 뷰어.
+    assets/plants/{PID}.png 일러스트가 있으면 사용, 없으면 도형 폴백."""
+    ill = plant_illust(pid)
+    _pi = _white_to_transparent(ill) if ill else draw_plant(400, "blue" if pid == "P416" else None)
+    _b = io.BytesIO(); _pi.save(_b, "PNG")
+    img_b64 = base64.b64encode(_b.getvalue()).decode()
+    components.html(f"""
+    <div id="box" style="position:relative; width:100%; height:{height-46}px;
+         background:#f5faf5; border:1px solid #dcecdc; border-radius:12px;
+         touch-action:pan-y; user-select:none; overflow:hidden;">
+      <img id="img" src="data:image/png;base64,{img_b64}"
+           style="position:absolute; left:50%; top:50%; width:{init_size}%; height:auto;
+                  transform:translate(-50%,-50%); cursor:grab;
+                  filter:drop-shadow(0 4px 8px rgba(0,0,0,.2));">
+    </div>
+    <div style="text-align:center; color:#888; font-size:12px; margin-top:7px;
+         font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;">
+       ✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 &nbsp;(PC: 드래그 이동·휠 크기)</div>
+    <script>
+    (function(){{
+      const box=document.getElementById('box'), img=document.getElementById('img');
+      let px=50, py=50, scale={init_size};
+      function apply(){{ img.style.left=px+'%'; img.style.top=py+'%'; img.style.width=scale+'%'; }}
+      function rect(){{ return box.getBoundingClientRect(); }}
+      let dragging=false, ox=0, oy=0;
+      function sd(cx,cy){{ dragging=true; img.style.cursor='grabbing'; const r=rect();
+        ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
+      function mv(cx,cy){{ if(!dragging)return; const r=rect();
+        px=Math.min(98,Math.max(2,((cx-r.left-ox)/r.width)*100));
+        py=Math.min(98,Math.max(2,((cy-r.top-oy)/r.height)*100)); apply(); }}
+      function ed(){{ dragging=false; img.style.cursor='grab'; }}
+      img.addEventListener('mousedown',e=>{{sd(e.clientX,e.clientY);e.preventDefault();}});
+      window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));
+      window.addEventListener('mouseup',ed);
+      box.addEventListener('wheel',e=>{{ scale=Math.min(170,Math.max(15,
+        scale-Math.sign(e.deltaY)*4)); apply(); e.preventDefault(); }},{{passive:false}});
+      let pinch=0, s0={init_size}, px0=0, py0=0, mx0=0, my0=0;
+      function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+        return Math.hypot(dx,dy); }}
+      function mid(t){{ return {{x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}}; }}
+      box.addEventListener('touchstart',e=>{{
+        if(e.touches.length===2){{
+          const r=rect(), m=mid(e.touches);
+          dragging=false; pinch=dist(e.touches); s0=scale;
+          px0=px; py0=py; mx0=(m.x-r.left)/r.width*100; my0=(m.y-r.top)/r.height*100;
+          e.preventDefault();
+        }}                                                  // 한 손가락 → 페이지 스크롤
+      }},{{passive:false}});
+      box.addEventListener('touchmove',e=>{{
+        if(e.touches.length===2 && pinch>0){{
+          const r=rect(), m=mid(e.touches);
+          scale=Math.min(170,Math.max(15, s0*(dist(e.touches)/pinch)));
+          const mx=(m.x-r.left)/r.width*100, my=(m.y-r.top)/r.height*100;
+          px=Math.min(98,Math.max(2, px0+(mx-mx0)));
+          py=Math.min(98,Math.max(2, py0+(my-my0)));
+          apply(); e.preventDefault();
+        }}
+      }},{{passive:false}});
+      box.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
+      apply();
+    }})();
+    </script>
+    """, height=height)
 
 # ── 라우팅 ───────────────────────────────────────────────────────────────────
 ss = st.session_state
@@ -827,10 +1056,17 @@ ss.setdefault("face_step", 1); ss.setdefault("space_step", 1)
 def go(p): ss.page = p; st.rerun()
 
 def show_plant_intro(name, registered):
-    """API(제미나이)로 식물 유형·특징·관리법 소개. 키 없으면 DB 기본정보 폴백."""
-    tag = "🤖 Gemini" if gemini_on() else "기본 정보"
-    if gemini_on():
-        with st.spinner(f"'{name}' 식물 정보를 AI로 분석 중..."):
+    """식물 소개. Gemini 키가 있고 정상이면 AI 분석, 실패하거나 키가 없으면
+    plants_master.csv(단지 카탈로그) 정보로 폴백한다.
+    · 같은 이름은 세션 캐시로 재호출하지 않음(반복 실패/지연 방지)
+    · 한 번 실패하면 이후 검색은 AI를 생략하고 조용히 카탈로그로 표시."""
+    ai_available = gemini_on() and not ss.get("plant_ai_off")
+    info = None
+    if ai_available:
+        cache = ss.setdefault("plant_ai_cache", {})
+        if name in cache:
+            info = cache[name]                          # 이미 조회한 이름 → 재호출 안 함
+        else:
             names = "、".join(PLANT_NAMES.values())
             prompt = (
                 f"너는 원예 전문가다. 식물 '{name}'을 소개한다.\n"
@@ -841,66 +1077,94 @@ def show_plant_intro(name, registered):
                 f"'similar'는 반드시 이 목록에서만: {names}\n"
                 f"'{name}'이 식물이 아니면 exists=false.")
             try:
-                info = gm.ask_json(api_key, prompt)
+                with st.spinner(f"'{name}' 식물 정보를 AI로 분석 중..."):
+                    info = gm.ask_json(api_key, prompt)
             except Exception as e:
-                st.error(f"AI 조회 실패: {type(e).__name__} — 기본 정보로 대체")
                 info = None
+                ss.plant_ai_off = True                  # 이후 검색은 AI 생략(스팸 방지)
+                ss.plant_ai_err = type(e).__name__
+            cache[name] = info                          # None도 캐시 → 같은 이름 재시도 방지
         if info and info.get("exists"):
             ss.last_similar = info.get("similar", [])
             st.markdown(
                 f"<div class='result'><b style='font-size:19px'>{name}</b> "
                 f"<span style='color:#888'>{info.get('sci','')}</span> "
-                f"<span class='chip'>{tag}</span><br>"
+                f"<span class='chip'>🤖 Gemini</span><br>"
                 f"<b>유형</b>: {info.get('type','-')} · <b>난이도</b>: {info.get('level','-')}<br>"
                 f"{info.get('summary','')}<br>"
                 f"☀️ {info.get('light','-')} &nbsp; 💧 {info.get('water','-')}</div>",
                 unsafe_allow_html=True)
             return
-    # ── 폴백: DB 마스터의 기본 정보 (plant 테이블 있으면 사용) ──
+
+    # AI가 꺼졌다면(실패 이력) 세션당 1번만 안내
+    if ss.get("plant_ai_off") and not ss.get("plant_ai_notified"):
+        st.caption(f"ℹ️ AI 상세 분석을 불러오지 못해 단지 카탈로그 정보로 표시합니다. "
+                   f"(원인: {ss.get('plant_ai_err','오류')} · 사이드바에서 Gemini 키/모델 확인)")
+        ss.plant_ai_notified = True
+
+    # ── 폴백: 마스터 카탈로그(plants_master.csv) 기반 실제 식물 정보 ──
     if name in NAME_TO_PID:
-        try:
-            pid = NAME_TO_PID[name]
+        pid = NAME_TO_PID[name]
+        en, sci, cat = PLANT_EN.get(pid, ""), PLANT_SCI.get(pid, ""), PLANT_CAT.get(pid, "")
+        desc = PLANT_DESC.get(pid, "")
+        care = ""
+        try:  # care 컬럼이 있는 DB면 덤으로 표시(없어도 무방)
             row = conn.execute("SELECT care_level, light_need, water_cycle "
                                "FROM plant WHERE id=?", (pid,)).fetchone()
+            if row:
+                care = f"<br>난이도 {row[0]} · ☀️ {row[1]} · 💧 {row[2]}일 주기"
         except Exception:
-            row = None
-        if row:
-            st.markdown(
-                f"<div class='result'><b style='font-size:19px'>{name}</b> "
-                f"<span class='chip'>{tag}</span><br>"
-                f"난이도 {row[0]} · ☀️ {row[1]} · 💧 {row[2]}일 주기</div>",
-                unsafe_allow_html=True)
-            return
+            pass
         st.markdown(
             f"<div class='result'><b style='font-size:19px'>{name}</b> "
-            f"<span class='chip'>단지 취급 품종</span><br>"
-            "이 품종은 단지에서 취급 중입니다. 아래에서 취급 농원을 확인하세요.</div>",
+            + (f"<span style='color:#888'>{sci}</span> " if sci else "")
+            + f"<span class='chip'>단지 카탈로그</span><br>"
+            + (f"<b>영문명</b>: {en}<br>" if en else "")
+            + (f"<b>분류</b>: {cat}<br>" if cat else "")
+            + (f"{desc}<br>" if desc else "")
+            + "불로화훼단지에서 취급 중인 품종입니다. 아래에서 취급 농원·재고를 확인하세요."
+            + care + "</div>",
             unsafe_allow_html=True)
         return
-    st.info(f"'{name}'의 상세 정보가 준비되지 않았습니다. "
-            "(사이드바에서 Gemini 키를 연결하면 AI 소개가 표시됩니다)")
+    st.info(f"'{name}'은(는) 단지 카탈로그(1,001종)에 없는 품종입니다. "
+            "사이드바에서 Gemini 키를 연결하면 AI 소개를 볼 수 있습니다.")
 
 def show_stock_nurseries(pid, compact=False):
     """DB에서 해당 품종 취급 농원·재고 표시 + 트래픽 분배 추천 회원사."""
-    rows = conn.execute("""
-        SELECT s.nursery_id, n.name, s.qty, s.updated_at
-        FROM stock s JOIN nursery n ON n.id = s.nursery_id
-        WHERE s.plant_id = ? AND s.qty > 0
-        ORDER BY s.qty DESC""", (pid,)).fetchall()
+    try:
+        rows = conn.execute("""
+            SELECT s.nursery_id, n.name, s.qty, s.updated_at,
+                   n.zone, COALESCE(n.address,''), COALESCE(n.phone,'')
+            FROM stock s JOIN nursery n ON n.id = s.nursery_id
+            WHERE s.plant_id = ? AND s.qty > 0
+            ORDER BY s.qty DESC""", (pid,)).fetchall()
+    except sqlite3.OperationalError:          # 구 DB: 주소·전화 컬럼 없음 → 추가 후 재시도
+        _ensure_admin_columns(conn)
+        rows = conn.execute("""
+            SELECT s.nursery_id, n.name, s.qty, s.updated_at,
+                   n.zone, COALESCE(n.address,''), COALESCE(n.phone,'')
+            FROM stock s JOIN nursery n ON n.id = s.nursery_id
+            WHERE s.plant_id = ? AND s.qty > 0
+            ORDER BY s.qty DESC""", (pid,)).fetchall()
     if not rows:
         st.error(f"현재 '{PLANT_NAMES.get(pid,'')}' 재고 보유 농원이 없습니다.")
+        st.caption("💡 관리자 모드에서 농원에 이 품종의 재고를 등록하면 여기에 표시됩니다.")
         return
     total = sum(r[2] for r in rows)
     st.markdown(f"<div class='nursery'>취급 농원 <b>{len(rows)}곳</b> · "
                 f"단지 총 재고 <b>{total}개</b></div>", unsafe_allow_html=True)
-    for nid, name, qty, upd in (rows if not compact else rows[:2]):
+    for nid, name, qty, upd, zone, addr, phone in (rows if not compact else rows[:2]):
         fresh = "🟢" if (upd and upd >= "2026") else "🟡"
-        kurl = kakao_map_url(name)
+        kurl = kakao_map_url(name, addr)
+        loc = addr or zone                    # 주소가 있으면 주소, 없으면 실제 구역
+        tel = (f"<a href='tel:{phone}' style='color:#e91e63; text-decoration:none; "
+               f"font-weight:700;'>📞 {phone}</a>" if phone else "")
         st.markdown(
-            f"<div class='nursery'>🏪 <b>{name}</b> ({nid}) · {zone_of(nid)}"
+            f"<div class='nursery'>🏪 <b>{name}</b> ({nid}) · {loc}"
             f"<br>재고 <b>{qty}개</b> {fresh} · "
             f"<a href='{kurl}' target='_blank' style='color:#1a73e8; "
-            f"text-decoration:none; font-weight:700;'>📍 지도</a> · 📞 전화</div>",
+            f"text-decoration:none; font-weight:700;'>📍 지도</a>"
+            + (f" · {tel}" if tel else "") + "</div>",
             unsafe_allow_html=True)
     if not compact:
         st.caption("🟢 재고 최근 갱신 · 🟡 갱신 필요(72h 기준)")
@@ -908,15 +1172,34 @@ def show_stock_nurseries(pid, compact=False):
         if b:
             st.markdown("#### ⭐ 오늘의 추천 회원사 (트래픽 분배)")
             best_card(b, pid)
+NOTICES = [
+    ("🎉", "봄맞이 분갈이 이벤트 — 이번 주말 현장 무료 분갈이"),
+    ("📅", "예약 확정 — 3/16(토) 14:00 대형 몬스테라 상담"),
+    ("🌸", "신규 입고 — 올리브나무·아레카야자 대형목"),
+]
+
 def header():
-    c1, c2 = st.columns([3, 1])
-    if asset("FL_Land.png"):
-        c1.image(asset("FL_Land.png"), width=260)
-    else:
-        c1.markdown("### 🌱 Flower Land <span style='font-size:13px;color:#777'>(플라워랜드)</span>",
-                    unsafe_allow_html=True)
-    c2.markdown(f"<div style='text-align:right;padding-top:14px'>{USER_NAME}님 🌿</div>",
-                unsafe_allow_html=True)
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)  # 로고 상단 여백
+    c1, c2 = st.columns([5, 2], vertical_alignment="center")  # 로고 높이에 맞춰 세로 가운데
+    logo = asset("FL_Land.png")
+    with c1:
+        # FL_Land.png 로고 자체가 홈 버튼 (탭하면 홈으로) — 테두리·여백 없이 로고만
+        if logo:
+            if clickable_image(logo, f"logohome_{page}", "300/96",
+                               fit="contain", frame=False):
+                go("home")
+        else:
+            if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
+                go("home")
+    with c2:
+        # 🔔 알림 벨 (신규 소식·예약 알림)
+        with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=True):
+            st.markdown("**📣 새 소식 · 예약 알림**")
+            for ico, txt in NOTICES:
+                st.markdown(f"{ico} {txt}")
+
+def home_button(page):
+    pass   # 홈 버튼 제거: 이제 헤더의 FL_Land.png 로고 자체가 홈 버튼
 
 page = ss.page
 
@@ -959,7 +1242,7 @@ if page == "home":
     ICON_ASPECT = ["165/222", "172/222", "172/222", "172/222"]
     for col, e, ic, asp, t, s, tgt in zip(cols, "🗺️🪴🔍💧", ICON_FILES, ICON_ASPECT,
             ["농원 지도", "분갈이·화분 특화", "식물 건강 진단", "내 식물 관리"],
-            ["80개 농원 안내", "특화 농원 보기", "시든 식물 처방", "물·영양 알림"],
+            ["40개 농원 안내", "특화 농원 보기", "시든 식물 처방", "물·영양 알림"],
             ["map", "repot", "diag", "care"]):
         with col:
             if asset(ic):
@@ -1000,7 +1283,7 @@ if page == "home":
 # ══════════════ 식물 상세 (TOP5 등에서 진입) ══════════════
 elif page == "plant":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     pid = ss.get("plant_pid")
     if not pid or pid not in PLANT_NAMES:
         st.warning("식물 정보를 찾을 수 없습니다.")
@@ -1008,11 +1291,10 @@ elif page == "plant":
     name = PLANT_NAMES[pid]
     st.markdown(f"## 🌿 {name}")
 
-    # ⓪ 일러스트 (있는 식물만 — assets/plants/{PID}.png 로 추가 가능)
+    # ⓪ 일러스트 (있는 식물만) — 핀치/휠로 크기 조절 · 끌어서 이동
     ill = plant_illust(pid)
     if ill:
-        _c = st.columns([1, 2, 1])[1]
-        _c.image(_thumb(ill, 640), use_container_width=True)
+        pinch_image(pid)
 
     # ① API(제미나이): 식물 유형·소개
     st.markdown("### 식물 소개")
@@ -1032,16 +1314,13 @@ elif page == "face":
     header()
     step = ss.face_step
     if step == 1:
-        hc1, hc2 = st.columns([1, 3])
-        with hc1:
-            if st.button("← 홈으로", key=f"home_{page}", use_container_width=True): go("home")
-        with hc2:
-            st.markdown(
-                "<div class='step' style='padding-top:8px'>"
-                "1단계 : 분석할 셀카를 찍어주세요</div>",
-                unsafe_allow_html=True)
+        home_button(page)
+        st.markdown(
+            "<div class='step' style='padding-top:4px'>"
+            "1단계 : 분석할 셀카를 찍어주세요</div>",
+            unsafe_allow_html=True)
     else:
-        if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+        home_button(page)
 
     if step == 1:
         ss.mbti = st.selectbox("MBTI (선택)", ["선택 안 함"] + [
@@ -1072,37 +1351,21 @@ elif page == "face":
         st.markdown("<div class='step'>3단계: 유형 카드 공유 & 매칭 농원</div>",
                     unsafe_allow_html=True)
 
-        # ── 식물 위치·크기 조정 (공간 3단계 '가상 배치'와 동일한 방식) ──
-        st.caption("👆 식물을 끌어 옮기고 두 손가락/휠로 크기를 조절한 뒤 "
-                   "‘이 위치로 확정’을 누르면 아래 카드에 반영됩니다.")
-        fx = ss.get("fmx", 72); fy = ss.get("fmy", 45); fsc = ss.get("fmsc", 46)
-        fres = interactive_place(ss.face_img, pid, fx, fy, fsc, "f")
-        if fres:
-            ss.fmx, ss.fmy, ss.fmsc = fres; st.rerun()
+        # 카드 자체에서 바로 조작: 식물을 끌어 이동 · 핀치/휠로 크기 → 카드 PNG 저장
+        interactive_card(ss.face_img, pid, copy, score, greeting)
 
-        # 확정 위치가 있으면 셀카 위 오버레이 카드, 없으면 기존 좌우 배치 카드
-        pos = (ss.fmx, ss.fmy, ss.fmsc) if all(
-            k in ss for k in ("fmx", "fmy", "fmsc")) else None
-        card = share_card(ss.face_img, pid, copy, score, greeting=greeting, pos=pos)
-        st.image(card, use_container_width=True) # ◀ 결과 카드 화면 폭에 꽉 차게 확대
-        buf = io.BytesIO(); card.convert("RGB").save(buf, "PNG")
-        st.download_button("📤 결과 공유하기 (카드 PNG 저장)", buf.getvalue(),
-                           file_name=f"flowerland_{PLANT_NAMES[pid]}.png",
-                           mime="image/png", type="primary", use_container_width=True)
-        st.markdown("#### 80개 전체 농원 노출 · 최우수 매칭")
+        st.markdown("#### 40개 전체 농원 노출 · 최우수 매칭")
         b = best_nursery(pid, "fun01")
         if b: best_card(b, pid)
         if st.button("처음부터 다시", use_container_width=True):
-            for _k in ("fmx", "fmy", "fmsc"):
-                ss.pop(_k, None)                 # 위치·크기 초기화
             ss.face_step = 1; st.rerun()
 
 # ══════════════ 공간 플랜테리어 (4단계) ══════════════
 elif page == "space":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     step = ss.space_step
-    st.progress(step / 4, text=f"{step}단계 / 4단계")
+    st.progress(step / 3, text=f"{step}단계 / 3단계")
 
     if step == 1:
         st.markdown("<div class='step'>1단계: 공간 사진 등록</div>", unsafe_allow_html=True)
@@ -1135,12 +1398,11 @@ elif page == "space":
                 ss.sp_ai = None; ss.sp_ai_h = h
         ai = ss.get("sp_ai") if ss.get("sp_ai_h") == h else None
 
-        st.markdown("<div class='step'>2단계: 공간 정밀 분석"
+        st.markdown("<div class='step'>2단계: 정밀 분석 & 가상 배치"
                     + (" · 🤖 Gemini" if ai else " · 목업") + "</div>",
                     unsafe_allow_html=True)
         st.markdown(f"<div class='big'>AI가 당신의 {ss.room}을 분석했습니다!</div>",
                     unsafe_allow_html=True)
-        st.image(ss.sp_img, use_container_width=True)
         icons = ["☀️", "🌱", "❄️", "📐"] if outdoor else ["🪟", "💡", "🎨", "📏"]
         if ai and ai.get("cards"):
             cards = [(icons[i % 4], c.get("title", ""),
@@ -1151,7 +1413,7 @@ elif page == "space":
             recs = [pid_of(n, fb) for n, fb in zip(ai.get("plants", []), _fallback)]
             # 유효하지 않은 PID(마스터에 없음)는 기본 추천으로 교체
             recs = [(p if p in PLANT_NAMES else fb)
-                    for p, fb in zip(recs + _fallback, _fallback)][:3]
+                    for p, fb in zip(recs + _fallback, _fallback)][:5]
             if not recs:
                 recs = _fallback
             ss.sp_match = int(ai.get("match", 97))
@@ -1171,40 +1433,32 @@ elif page == "space":
             recs = (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
             ss.sp_match = 95 + h % 5
             ss.sp_reason = ""
-        for r in range(2):
-            c1, c2 = st.columns(2)
-            for col, (e, t, s) in zip((c1, c2), cards[r*2:r*2+2]):
-                col.markdown(f"<div class='acard'><span class='e'>{e}</span><br>"
-                             f"<span class='t'>{t}</span><br><span class='s'>{s}</span></div>",
-                             unsafe_allow_html=True)
+        # ── 분석 카드 4종을 한 줄로 압축 (요청: 한 줄로) ──
+        chips = " &nbsp;·&nbsp; ".join(
+            f"{e} <b>{t}</b> {s.split('<br>')[0]}" for (e, t, s) in cards)
+        st.markdown(f"<div class='acard' style='text-align:left; font-size:13px; "
+                    f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
         st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
-        st.markdown("#### 추천 식물들")
-        cols = st.columns(3)
-        for col, pid in zip(cols, recs):
-            ill = plant_illust(pid)
-            if ill:
-                col.image(_thumb(ill, 240), use_container_width=True)
-                col.markdown(f"<div style='text-align:center'><b>{PLANT_NAMES[pid]}</b> 👍</div>",
-                             unsafe_allow_html=True)
-            else:
-                col.markdown(f"<div class='top5'><div style='font-size:34px'>🌿</div>"
-                             f"<b>{PLANT_NAMES[pid]}</b> 👍</div>", unsafe_allow_html=True)
-        ss.sp_recs = recs      # 4단계에서 3종 추천 재사용
-        ss.sp_pid = st.radio("가상 배치할 식물 선택",
-                             recs, format_func=lambda p: PLANT_NAMES[p], horizontal=True)
-        if st.button("다음", type="primary", use_container_width=True):
-            ss.space_step = 3; st.rerun()
 
-    elif step == 3:
+        # ── 추천 식물 5종 준비 + 배치할 식물 확정 ──
+        ss.sp_recs = recs
+        if ss.get("sp_pid") not in recs:
+            ss.sp_pid = recs[0]
         pid = ss.sp_pid
-        st.markdown("<div class='step'>3단계: 가상 플랜테리어 체험</div>", unsafe_allow_html=True)
-        mode = st.radio("합성 방식", ["🤖 AI 실사 합성 (Gemini)", "🎚️ 수동 배치 (슬라이더)"],
-                        horizontal=True, index=0 if gemini_on() else 1)
-        if mode.startswith("🤖"):
+
+        # ── 가상 배치 (기존 3단계를 여기로 병합) ──
+        st.markdown("##### 🪴 가상 배치 체험")
+        mode = st.radio("합성 방식", ["🎚️ 수동 배치", "🤖 AI 실사 합성 (Gemini)"],
+                        horizontal=True, index=0)   # 수동 배치가 기본
+        if mode.startswith("🎚️"):
+            st.caption("✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 "
+                       "(PC는 드래그 이동, 휠로 크기)")
+            place_stage(pid, key="st2")             # 확정 버튼 없이 실시간 배치
+        else:
             if not gemini_on():
                 st.warning("사이드바에 Gemini API 키를 입력하면 실사 합성이 가능합니다.")
             else:
-                cache_key = (img_hash(ss.sp_img), pid)
+                cache_key = (h, pid)
                 if ss.get("comp_key") != cache_key:
                     try:
                         with st.spinner(f"🤖 Gemini가 {PLANT_NAMES[pid]}을(를) "
@@ -1220,150 +1474,39 @@ elif page == "space":
                              caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Gemini)")
                     if st.button("🔄 다시 합성하기", use_container_width=True):
                         ss.comp_key = None; st.rerun()
-        else:
-            st.caption("👆 식물을 손가락으로 끌어 옮기고, 두 손가락으로 크기를 조절한 뒤 "
-                       "‘이 위치로 확정’을 누르세요. (마우스는 드래그 이동, 휠로 크기)")
-            # 서버가 이전에 확정한 값이 있으면 초기 위치로 사용
-            init_x = ss.get("mx", 50); init_y = ss.get("my", 60); init_s = ss.get("msc", 38)
-            # 배경(공간 사진) + 식물 이미지를 base64로 브라우저에 전달 → 실시간 조작
-            bg_b64 = base64.b64encode(ss.sp_img).decode()
-            ill = plant_illust(pid)
-            if ill:
-                _pi = _white_to_transparent(ill)   # 흰 배경 투명 처리
-                _buf = io.BytesIO(); _pi.save(_buf, "PNG")
-                plant_b64 = base64.b64encode(_buf.getvalue()).decode()
-            else:
-                _pl = draw_plant(400, "blue" if pid == "P416" else None)
-                _buf = io.BytesIO(); _pl.save(_buf, "PNG")
-                plant_b64 = base64.b64encode(_buf.getvalue()).decode()
 
-            components.html(f"""
-            <div id="stage" style="position:relative; width:100%; max-width:700px;
-                 margin:0 auto; touch-action:none; user-select:none; border-radius:12px;
-                 overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.15);">
-              <img id="bg" src="data:image/jpeg;base64,{bg_b64}"
-                   style="width:100%; display:block; pointer-events:none;">
-              <img id="plant" src="data:image/png;base64,{plant_b64}"
-                   style="position:absolute; left:{init_x}%; top:{init_y}%; width:{init_s}%;
-                          transform:translate(-50%,-50%); cursor:grab;
-                          filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));">
-              <div style="position:absolute; left:8px; bottom:8px; background:rgba(46,125,50,.85);
-                   color:#fff; font-size:12px; padding:3px 9px; border-radius:8px;">
-                {PLANT_NAMES[pid]} — 끌어서 이동 · 두 손가락/휠로 크기</div>
-            </div>
-            <div style="text-align:center; margin-top:10px;">
-              <button id="confirm" style="background:#2e7d32; color:#fff; border:none;
-                 font-size:16px; font-weight:700; padding:11px 28px; border-radius:10px;
-                 cursor:pointer;">✅ 이 위치로 확정</button>
-              <span id="pos" style="margin-left:10px; color:#666; font-size:13px;"></span>
-            </div>
-            <script>
-            (function(){{
-              const stage=document.getElementById('stage');
-              const plant=document.getElementById('plant');
-              let px={init_x}, py={init_y}, scale={init_s};       // % 단위
-              function apply(){{
-                plant.style.left=px+'%'; plant.style.top=py+'%'; plant.style.width=scale+'%';
-                document.getElementById('pos').textContent =
-                  '좌우 '+Math.round(px)+'% · 상하 '+Math.round(py)+'% · 크기 '+Math.round(scale)+'%';
-              }}
-              function rect(){{ return stage.getBoundingClientRect(); }}
-              let dragging=false, ox=0, oy=0;
-              function startDrag(cx,cy){{ dragging=true; plant.style.cursor='grabbing';
-                const r=rect(); ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
-              function moveDrag(cx,cy){{ if(!dragging)return; const r=rect();
-                px=Math.min(95,Math.max(5,((cx-r.left-ox)/r.width)*100));
-                py=Math.min(95,Math.max(5,((cy-r.top-oy)/r.height)*100)); apply(); }}
-              function endDrag(){{ dragging=false; plant.style.cursor='grab'; }}
-              plant.addEventListener('mousedown',e=>{{startDrag(e.clientX,e.clientY);e.preventDefault();}});
-              window.addEventListener('mousemove',e=>moveDrag(e.clientX,e.clientY));
-              window.addEventListener('mouseup',endDrag);
-              stage.addEventListener('wheel',e=>{{ scale=Math.min(90,Math.max(10,
-                scale - Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
-              let pinchStart=0, scaleStart={init_s};
-              function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
-                return Math.hypot(dx,dy); }}
-              stage.addEventListener('touchstart',e=>{{
-                if(e.touches.length===1){{ startDrag(e.touches[0].clientX,e.touches[0].clientY); }}
-                else if(e.touches.length===2){{ dragging=false; pinchStart=dist(e.touches);
-                  scaleStart=scale; }}
-                e.preventDefault();
-              }},{{passive:false}});
-              stage.addEventListener('touchmove',e=>{{
-                if(e.touches.length===1){{ moveDrag(e.touches[0].clientX,e.touches[0].clientY); }}
-                else if(e.touches.length===2 && pinchStart>0){{
-                  scale=Math.min(90,Math.max(10, scaleStart*(dist(e.touches)/pinchStart))); apply(); }}
-                e.preventDefault();
-              }},{{passive:false}});
-              stage.addEventListener('touchend',e=>{{ if(e.touches.length===0){{endDrag();pinchStart=0;}} }});
-              // ── 확정: 부모(Streamlit) URL에 값 실어 새로고침 → 서버가 읽어 합성 ──
-              document.getElementById('confirm').addEventListener('click',function(){{
-                const p = window.parent;
-                const url = new URL(p.location.href);
-                url.searchParams.set('mx', Math.round(px));
-                url.searchParams.set('my', Math.round(py));
-                url.searchParams.set('msc', Math.round(scale));
-                p.location.href = url.toString();
-              }});
-              apply();
-            }})();
-            </script>
-            """, height=590)
-
-            # ── 서버: URL 쿼리파라미터로 넘어온 확정값을 읽어 합성 ──
-            qp = st.query_params
-            if "mx" in qp and "my" in qp and "msc" in qp:
-                try:
-                    ss.mx = int(qp["mx"]); ss.my = int(qp["my"]); ss.msc = int(qp["msc"])
-                except ValueError:
-                    pass
-                st.query_params.clear()   # 값 소비 후 URL 정리(무한루프 방지)
-            if "mx" in ss:
-                st.success(f"확정 위치: 좌우 {ss.mx}% · 상하 {ss.my}% · 크기 {ss.msc}%")
-                ss.comp_img = composite_plant(ss.sp_img, pid, ss.mx, ss.my, ss.msc,
-                                              f"{PLANT_NAMES[pid]} 대형 화분")
-                st.image(ss.comp_img, use_container_width=True,
-                         caption="확정한 위치로 합성된 결과 (저장됩니다)")
-        b1, b2, b3 = st.columns(3)
-        b1.button("🔄 식물 변경", use_container_width=True,
-                  on_click=lambda: ss.update(space_step=2))
-        b2.button("🛒 장바구니 담기", use_container_width=True)
-        b3.button("🏺 화분 스타일 (토분/야외용)", use_container_width=True)
-        if st.button("다음", type="primary", use_container_width=True):
-            ss.space_step = 4; st.rerun()
+        # ── 추천 식물 5종: 사진 아래에서 탭하면 사진에 올라옵니다 ──
+        st.markdown("#### 🌿 추천 식물 5종 · 탭하면 사진에 올라옵니다")
+        plant_picker(recs, "pick2")
+        if mode.startswith("🎚️"):
+            _pot = ["토분", "플라스틱(화이트)", "야외용(다크)"]
+            ss.pot_style = st.selectbox("🏺 화분 스타일", _pot,
+                                        index=_pot.index(ss.get("pot_style", "토분")),
+                                        help="일러스트가 도형인 식물의 화분 색에 반영됩니다.")
+        st.button("🛒 장바구니 담기", use_container_width=True)
+        if st.button("다음 →", type="primary", use_container_width=True):
+            ss.space_step = 3; st.rerun()
 
     else:
         pid = ss.sp_pid
+        recs = ss.get("sp_recs") or [pid]
         h = img_hash(ss.sp_img)
         match = ss.get("sp_match", 95 + h % 5)
-        st.markdown("<div class='step'>4단계: 나의 최적 식물 & 농원</div>",
+        st.markdown("<div class='step'>3단계: 나의 최적 식물 & 농원</div>",
                     unsafe_allow_html=True)
         st.markdown(f"<div class='big'>{USER_NAME}님! 이 식물이 당신의 {ss.room}과 "
                     f"{match}% 어울립니다!</div>", unsafe_allow_html=True)
-        pc1, pc2 = st.columns([1, 2])
-        if ss.get("comp_img"):
-            pc1.image(ss.comp_img)
-        else:
-            pc1.image(plant_image(pid, 220, "blue" if pid == "P416" else None))
+
+        # 사진 위에 식물 배치 미리보기 (핀치=크기·위치, 요청 8)
+        place_stage(pid, key="st4")
+        st.markdown("##### 🌿 다른 식물로 바꿔보기 · 탭하면 사진에 올라옵니다")
+        plant_picker(recs, "pick4")
+
         reason = ss.get("sp_reason") or PLANT_DESC.get(
             pid, "이 공간의 채광·규모에 최적화된 추천 식물")
-        pc2.markdown(f"""<div class='result'><b style='font-size:20px'>{PLANT_NAMES[pid]}</b><br>
-            {reason}<br>단지 평균가 / 건강 장수 수명 ⭐ 4.9</div>""", unsafe_allow_html=True)
-
-        # ── 사진 바로 아래: 이 공간에 어울리는 3가지 추천 식물 ──
-        recs = ss.get("sp_recs") or [pid]
-        st.markdown("#### 🌿 이 공간에 어울리는 추천 식물 3가지")
-        rcols = st.columns(3)
-        for col, rp in zip(rcols, recs[:3]):
-            ill = plant_illust(rp)
-            if ill:
-                col.image(_thumb(ill, 240), use_container_width=True)
-            else:
-                col.markdown("<div style='text-align:center;font-size:48px'>🌿</div>",
-                             unsafe_allow_html=True)
-            _mark = " ✅" if rp == pid else ""
-            col.markdown(f"<div style='text-align:center'><b>{PLANT_NAMES[rp]}</b>{_mark}</div>",
-                         unsafe_allow_html=True)
+        st.markdown(f"<div class='result'><b style='font-size:20px'>{PLANT_NAMES[pid]}</b><br>"
+                    f"{reason}<br>단지 평균가 / 건강 장수 수명 ⭐ 4.9</div>",
+                    unsafe_allow_html=True)
 
         st.markdown("#### 이 식물을 가장 잘 키우고 조경 자재를 보유한 농원")
         b = best_nursery(pid, "fun02")
@@ -1374,26 +1517,46 @@ elif page == "space":
 # ══════════════ 식물 검색 (취급 회원사 찾기) ══════════════
 elif page == "search":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🔎 식물 검색")
     st.caption("① AI가 식물 유형·특징을 소개하고 ② DB에서 취급 농원(재고)을 안내합니다.")
-    q = st.text_input("식물 이름", value=ss.get("search_q", ""),
-                      placeholder="예: 몬스테라, 수국, 필로덴드론 버킨")
 
-    if q.strip():
-        term = q.strip()
-        hits = [(pid, nm) for pid, nm in PLANT_NAMES.items() if term in nm]
+    # 홈에서 넘어온 검색어를 아래 입력창(세션)에 반영
+    if ss.get("search_q") and ss.get("_last_sq") != ss.get("search_q"):
+        ss._last_sq = ss.search_q
+        ss.search_box = ss.search_q
+    ss.setdefault("search_box", "")
+    term = ss.search_box.strip()
 
-        # 품종 확정: DB 매칭 우선, 없으면 None(=미등록)
-        pid = None
-        if hits:
-            pid = (st.radio("품종 선택", [h[0] for h in hits],
-                            format_func=lambda p: PLANT_NAMES[p], horizontal=True)
-                   if len(hits) > 1 else hits[0][0])
+    pid = None
+    disp_name = term
+    hit_pids = []
+    if term:
+        hits = [(p, nm) for p, nm in PLANT_NAMES.items() if term in nm]
+        hit_pids = [h[0] for h in hits]
+        # 새 검색어면 품종 선택 초기화(옵션 불일치 방지)
+        if ss.get("search_term_seen") != term:
+            ss.search_term_seen = term
+            ss.pop("variety_pick", None)
+        if hit_pids:
+            cur = ss.get("variety_pick")
+            pid = cur if cur in hit_pids else hit_pids[0]
             disp_name = PLANT_NAMES[pid]
-        else:
-            disp_name = term
+            # ── 카탈로그 이미지: 식물 검색 아래 · 식물 이름 위 ──
+            st.markdown("### 🖼️ 카탈로그 이미지")
+            pinch_image(pid)
+            # ── 품종 선택 ──
+            if len(hit_pids) > 1:
+                pid = st.radio("품종 선택", hit_pids,
+                               format_func=lambda p: PLANT_NAMES[p],
+                               horizontal=True, key="variety_pick")
+                disp_name = PLANT_NAMES[pid]
 
+    # ── 식물 이름 (검색 입력) — 카탈로그 이미지 아래 ──
+    st.text_input("식물 이름", key="search_box",
+                  placeholder="예: 몬스테라, 수국, 필로덴드론 버킨")
+
+    if term:
         # ── ① API(제미나이): 식물 유형·소개 ──────────────────────
         st.markdown("### 🌿 식물 소개")
         show_plant_intro(disp_name, registered=bool(pid))
@@ -1417,7 +1580,7 @@ elif page == "search":
 # ══════════════ 회원사 관리자 모드 ══════════════
 elif page == "admin":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🔑 회원사 관리자 모드")
 
     # ── 로그인 상태 관리 ──
@@ -1461,7 +1624,7 @@ elif page == "admin":
                 st.caption("시연 편의를 위해 각 농원 PIN은 아래에서 확인 가능합니다. "
                            "실서비스에서는 상인회가 개별 발급합니다.")
                 if st.checkbox("전체 PIN 표시"):
-                    rows = conn.execute("SELECT id, name, pin FROM nursery ORDER BY id LIMIT 80").fetchall()
+                    rows = conn.execute("SELECT id, name, pin FROM nursery ORDER BY id LIMIT 100").fetchall()
                     st.dataframe({"농원ID":[r[0] for r in rows],
                                   "이름":[r[1] for r in rows],
                                   "PIN":[r[2] for r in rows]}, height=200)
@@ -1535,26 +1698,26 @@ elif page == "admin":
 
         # --- 내 노출 현황 ---
         with tab3:
-            since = (datetime.now() - timedelta(days=7)).isoformat()
-            mine = conn.execute("SELECT COUNT(*) FROM exposure_log WHERE nursery_id=? AND ts>=?",
-                                (nid, since)).fetchone()[0]
-            allc = conn.execute("SELECT COUNT(*) FROM exposure_log WHERE ts>=?", (since,)).fetchone()[0]
-            avg = allc / 80 if allc else 0
-            ef = conn.execute("SELECT expo_factor FROM nursery WHERE id=?", (nid,)).fetchone()[0]
+            n_nur = conn.execute("SELECT COUNT(*) FROM nursery").fetchone()[0] or 1
+            mine = conn.execute("SELECT COALESCE(SUM(cnt),0) FROM dispatch_log WHERE nursery_id=?",
+                                (nid,)).fetchone()[0]
+            allc = conn.execute("SELECT COALESCE(SUM(cnt),0) FROM dispatch_log").fetchone()[0]
+            avg = allc / n_nur if allc else 0
+            mystock = conn.execute("SELECT COUNT(DISTINCT plant_id) FROM stock WHERE nursery_id=?",
+                                   (nid,)).fetchone()[0]
             c1, c2, c3 = st.columns(3)
-            c1.metric("주간 추천 노출", f"{mine}회")
+            c1.metric("누적 추천 노출", f"{mine}회")
             c2.metric("단지 평균 대비", f"{(mine/avg*100 if avg else 0):.0f}%")
-            c3.metric("현재 노출 가중치", f"{ef:.2f}")
-            st.caption("재고를 자주 갱신할수록(신선도 유지) 노출 가중치가 올라갑니다. "
-                       "가중치는 매일 04시 자동 재계산됩니다.")
+            c3.metric("등록 식물 수", f"{mystock}종")
+            st.caption("재고를 많이·자주 등록할수록 추천 노출 기회가 늘어납니다. "
+                       "추천 분배는 재고량과 최근 배정 이력으로 실시간 계산됩니다.")
 
     # ══ 상인회 마스터 대시보드 ══
     elif ss.is_master:
         st.markdown("### 📊 상인회 통합 대시보드")
-        since = (datetime.now() - timedelta(days=7)).isoformat()
         counts = dict(conn.execute(
-            "SELECT nursery_id, COUNT(*) FROM exposure_log WHERE ts>=? GROUP BY nursery_id",
-            (since,)).fetchall())
+            "SELECT nursery_id, COALESCE(SUM(cnt),0) FROM dispatch_log GROUP BY nursery_id"
+            ).fetchall())
         allids = [r[0] for r in conn.execute("SELECT id FROM nursery").fetchall()]
         vals = [counts.get(i, 0) for i in allids]
         import numpy as _np
@@ -1567,7 +1730,7 @@ elif page == "admin":
         c1, c2, c3 = st.columns(3)
         c1.metric("지니계수", f"{g:.3f}", "목표 ≤0.35 " + ("✅" if g <= 0.35 else "⚠️"))
         c2.metric("커버리지", f"{cov*100:.0f}%", "목표 ≥85% " + ("✅" if cov >= 0.85 else "⚠️"))
-        c3.metric("주간 총 노출", f"{sum(vals)}회")
+        c3.metric("누적 추천 노출", f"{sum(vals)}회")
         st.divider()
         st.markdown("#### 농원별 노출 · 등록 식물 수 (상위/하위)")
         stat = conn.execute("""SELECT n.id, n.name, COUNT(DISTINCT s.plant_id) plants,
@@ -1579,15 +1742,219 @@ elif page == "admin":
             "농원":[f"{r[1]}" if r[0]!="..." else "..." for r in rows_show],
             "등록식물":[r[2] for r in rows_show],
             "총재고":[r[3] for r in rows_show],
-            "주간노출":[counts.get(r[0],0) if r[0]!="..." else "..." for r in rows_show],
+            "추천노출":[counts.get(r[0],0) if r[0]!="..." else "..." for r in rows_show],
         }, height=430)
         st.caption("미등록·저노출 농원을 파악해 재고 등록을 독려하세요. "
                    "노출 편중이 심하면(지니↑) 알고리즘이 자동 보정합니다.")
 
+        # ── 🏪 농원 직접 등록·편집 (이름·주소 등 수기 입력) ──
+        st.divider()
+        st.markdown("#### 🏪 농원 직접 등록·편집")
+        ZONE_OPTS = ["A동", "B동", "C동", "D동", "E동", "노지구역"]
+        _ensure_admin_columns(conn)   # 주소·전화 컬럼 보장(구 DB 방어)
+
+        with st.expander("➕ 새 농원 등록", expanded=False):
+            with st.form("new_nursery", clear_on_submit=True):
+                fc = st.columns([2, 1])
+                nn_name = fc[0].text_input("농원명 *")
+                nn_id = fc[1].text_input("농원ID(비우면 자동)", placeholder="자동")
+                fc1 = st.columns([2, 1])
+                nn_addr = fc1[0].text_input("주소", placeholder="예: 대구 동구 불로동 000-0")
+                nn_phone = fc1[1].text_input("대표 전화번호", placeholder="예: 053-000-0000")
+                fc2 = st.columns(3)
+                nn_zone = fc2[0].selectbox("구역", ZONE_OPTS)
+                nn_pin = fc2[1].text_input("PIN(4자리)", max_chars=4)
+                nn_spec = fc2[2].text_input("전문분야", placeholder="예: 관엽")
+                nn_tag = st.text_input("소개문구", placeholder="예: 30년 전통 관엽 전문")
+                if st.form_submit_button("등록", type="primary"):
+                    if not nn_name.strip():
+                        st.error("농원명은 필수입니다.")
+                    else:
+                        nid = nn_id.strip() or _next_nursery_id()
+                        conn.execute(
+                            "INSERT INTO nursery(id,name,zone,pin,tagline,specialty,"
+                            "address,phone) VALUES(?,?,?,?,?,?,?,?) "
+                            "ON CONFLICT(id) DO UPDATE SET "
+                            "name=excluded.name, zone=excluded.zone, pin=excluded.pin, "
+                            "tagline=excluded.tagline, specialty=excluded.specialty, "
+                            "address=excluded.address, phone=excluded.phone",
+                            (nid, nn_name.strip(), nn_zone, nn_pin.strip(),
+                             nn_tag.strip(), nn_spec.strip(), nn_addr.strip(),
+                             nn_phone.strip()))
+                        conn.commit()
+                        ss.reg_msg = f"✅ '{nn_name.strip()}' ({nid}) 등록 완료"
+                        st.rerun()
+        if ss.get("reg_msg"):
+            st.success(ss.pop("reg_msg"))
+
+        # 기존 농원 편집 / 삭제
+        nlist = conn.execute("SELECT id, name FROM nursery ORDER BY id").fetchall()
+        if nlist:
+            esel = st.selectbox("편집할 농원 선택", [f"{n} ({i})" for i, n in nlist],
+                                key="edit_nur_sel")
+            enid = esel.split("(")[-1].rstrip(")")
+            cur = conn.execute(
+                "SELECT name, COALESCE(address,''), zone, COALESCE(pin,''), "
+                "COALESCE(tagline,''), COALESCE(specialty,''), COALESCE(phone,'') "
+                "FROM nursery WHERE id=?", (enid,)).fetchone()
+            ec = st.columns([2, 1])
+            e_name = ec[0].text_input("농원명", value=cur[0], key=f"en_{enid}")
+            e_zone = ec[1].selectbox("구역", ZONE_OPTS,
+                                     index=ZONE_OPTS.index(cur[2]) if cur[2] in ZONE_OPTS else 0,
+                                     key=f"ez_{enid}")
+            ec1 = st.columns([2, 1])
+            e_addr = ec1[0].text_input("주소", value=cur[1], key=f"ea_{enid}")
+            e_phone = ec1[1].text_input("대표 전화번호", value=cur[6], key=f"eph_{enid}")
+            ec2 = st.columns(2)
+            e_spec = ec2[0].text_input("전문분야", value=cur[5], key=f"es_{enid}")
+            e_pin = ec2[1].text_input("PIN(4자리)", value=cur[3], max_chars=4, key=f"ep_{enid}")
+            e_tag = st.text_input("소개문구", value=cur[4], key=f"et_{enid}")
+            bc = st.columns(2)
+            if bc[0].button("💾 저장", type="primary", key=f"esave_{enid}",
+                            use_container_width=True):
+                conn.execute("UPDATE nursery SET name=?, address=?, phone=?, zone=?, "
+                             "pin=?, tagline=?, specialty=? WHERE id=?",
+                             (e_name.strip(), e_addr.strip(), e_phone.strip(), e_zone,
+                              e_pin.strip(), e_tag.strip(), e_spec.strip(), enid))
+                conn.commit(); st.success("저장되었습니다."); st.rerun()
+            if bc[1].button("🗑 이 농원 삭제", key=f"edel_{enid}", use_container_width=True):
+                conn.execute("DELETE FROM stock WHERE nursery_id=?", (enid,))
+                conn.execute("DELETE FROM nursery WHERE id=?", (enid,))
+                conn.commit(); st.warning(f"{enid} 삭제됨"); st.rerun()
+
+            # ── 이 농원에 재고(취급 식물) 바로 등록 → 검색과 즉시 매칭 ──
+            st.markdown("##### 🌿 이 농원의 취급 식물(재고) 등록")
+            st.caption("여기서 재고를 넣어야 식물 검색 결과에 이 농원이 표시됩니다.")
+            my_stock = conn.execute(
+                "SELECT plant_id, qty FROM stock WHERE nursery_id=? ORDER BY qty DESC",
+                (enid,)).fetchall()
+            if my_stock:
+                st.caption("현재 등록: " + " · ".join(
+                    f"{PLANT_NAMES.get(p, p)} {q}개" for p, q in my_stock[:8])
+                    + (" 외" if len(my_stock) > 8 else ""))
+            sc = st.columns([3, 1.4, 1.6, 1.6, 1.2])
+            sp_pid2 = sc[0].selectbox("품종", list(PLANT_NAMES.keys()),
+                                      format_func=lambda p: PLANT_NAMES[p],
+                                      key=f"mstk_p_{enid}")
+            sp_q = sc[1].number_input("재고", 0, 9999, 10, key=f"mstk_q_{enid}")
+            sp_min = sc[2].number_input("최저가", 0, 999999, 15000, step=1000,
+                                        key=f"mstk_min_{enid}")
+            sp_max = sc[3].number_input("최고가", 0, 999999, 45000, step=1000,
+                                        key=f"mstk_max_{enid}")
+            if sc[4].button("등록", key=f"mstk_add_{enid}", type="primary"):
+                conn.execute(
+                    "INSERT INTO stock(nursery_id,plant_id,qty,price_min,price_max,"
+                    "updated_at) VALUES(?,?,?,?,?,?) "
+                    "ON CONFLICT(nursery_id,plant_id) DO UPDATE SET qty=excluded.qty, "
+                    "price_min=excluded.price_min, price_max=excluded.price_max, "
+                    "updated_at=excluded.updated_at",
+                    (enid, sp_pid2, sp_q, sp_min, sp_max,
+                     datetime.now().strftime("%Y-%m")))
+                conn.commit()
+                st.toast(f"{PLANT_NAMES[sp_pid2]} {sp_q}개 등록"); st.rerun()
+
+        # ── 💾 현재 DB 백업(CSV) — 앱 재시작 시 데이터 소실 대비 ──
+        st.divider()
+        st.markdown("#### 💾 현재 농원·재고 백업")
+        st.caption("배포 환경은 앱 재시작 시 DB가 초기화될 수 있습니다. "
+                   "수정 후 이 백업 CSV를 내려받아 두면, 초기화돼도 그대로 다시 업로드해 복구할 수 있습니다.")
+        import io as _io2, csv as _csv2
+        _buf = _io2.StringIO()
+        _w = _csv2.writer(_buf)
+        _w.writerow(["농원ID", "농원명", "주소", "대표전화", "구역", "소개문구",
+                     "전문분야", "PIN", "취급식물명", "취급식물ID", "재고수량",
+                     "최저가", "최고가"])
+        _ensure_admin_columns(conn)
+        for r in conn.execute("""
+            SELECT n.id, n.name, COALESCE(n.address,''), COALESCE(n.phone,''), n.zone,
+                   COALESCE(n.tagline,''), COALESCE(n.specialty,''), COALESCE(n.pin,''),
+                   s.plant_id, s.qty, COALESCE(s.price_min,0), COALESCE(s.price_max,0)
+            FROM nursery n LEFT JOIN stock s ON s.nursery_id = n.id
+            ORDER BY n.id, s.qty DESC""").fetchall():
+            _w.writerow([r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7],
+                         PLANT_NAMES.get(r[8], "") if r[8] else "",
+                         r[8] or "", r[9] or "", r[10] or "", r[11] or ""])
+        st.download_button("⬇️ 현재 농원·재고 전체 CSV 내려받기",
+                           ("\ufeff" + _buf.getvalue()).encode("utf-8"),
+                           file_name=f"농원백업_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                           mime="text/csv", use_container_width=True)
+
+        # ── 📁 농원·재고 CSV 일괄 업로드 ──
+        st.divider()
+        st.markdown("#### 📁 농원·재고 CSV 업로드")
+        st.caption("양식을 채워 올리면 농원과 취급 식물이 한 번에 등록됩니다. "
+                   "같은 농원ID의 여러 줄은 한 농원의 여러 취급식물로 묶입니다.")
+        _tmpl = ("농원ID,농원명,주소,대표전화,구역,소개문구,전문분야,PIN,취급식물명,취급식물ID,재고수량,최저가,최고가\n"
+                 "N001,불로원예,대구 동구 불로동 12-3,053-111-2222,A동,50년 전통 관엽·대형목 전문,관엽·대형목,1234,몬스테라,P001,12,25000,80000\n"
+                 "N001,불로원예,대구 동구 불로동 12-3,053-111-2222,A동,50년 전통 관엽·대형목 전문,관엽·대형목,1234,올리브나무,,5,120000,300000\n"
+                 "N002,그린가든,대구 동구 불로동 45,053-333-4444,B동,다육·선인장 특화,다육·선인장,5678,스투키,,30,8000,20000\n")
+        st.download_button("⬇️ 빈 양식(CSV) 내려받기", ("\ufeff" + _tmpl).encode("utf-8"),
+                           file_name="농원_취급식물_양식.csv", mime="text/csv",
+                           use_container_width=True)
+        up_csv = st.file_uploader("작성한 CSV 파일 선택", type=["csv"], key="nur_csv")
+        parsed = None
+        if up_csv is not None:
+            # ── 파일을 고르면 즉시 파싱 미리보기 (DB 반영 전) ──
+            try:
+                parsed = parse_nurseries_csv(up_csv.getvalue())
+                st.info(f"🔎 미리보기 — 인코딩: {parsed['encoding']} · "
+                        f"구분자: {parsed['delimiter']} · "
+                        f"농원 **{len(parsed['nurseries'])}곳** · "
+                        f"취급식물 **{len(parsed['stocks'])}건** 인식됨")
+                st.caption("인식된 헤더: " + ", ".join(parsed["headers"]))
+                if parsed["nurseries"]:
+                    prev = [(nid, v[0], v[5], v[6]) for nid, v
+                            in list(parsed["nurseries"].items())[:5]]
+                    st.dataframe({"농원ID": [p[0] for p in prev],
+                                  "농원명": [p[1] for p in prev],
+                                  "주소": [p[2] for p in prev],
+                                  "대표전화": [p[3] for p in prev]},
+                                 use_container_width=True, height=len(prev)*38+40)
+                else:
+                    st.warning("⚠️ 농원이 0곳 인식됐습니다. '농원명' 또는 '농원ID' "
+                               "열 이름이 정확한지 위 헤더 목록과 비교해 보세요.")
+                if parsed["warnings"]:
+                    with st.expander(f"⚠️ 파싱 경고 {len(parsed['warnings'])}건"):
+                        for w in parsed["warnings"][:80]:
+                            st.caption("· " + w)
+            except Exception as e:
+                import traceback as _tb
+                st.error(f"파일 읽기 실패: {type(e).__name__} — {e}")
+                st.code(_tb.format_exc()[-600:])
+        rep = st.checkbox("기존 농원·재고를 모두 지우고 새로 등록(전체 교체)", value=False,
+                          help="체크하면 시연용 데모 농원 전체를 포함해 전부 삭제 후 등록합니다.")
+        if parsed and parsed["nurseries"] and st.button(
+                "업로드 실행 (DB 반영)", type="primary", use_container_width=True):
+            try:
+                ss.last_import = import_nurseries_csv(up_csv.getvalue(),
+                                                      replace=rep, parsed=parsed)
+            except Exception as e:
+                import traceback as _tb
+                ss.last_import = {"error": f"{type(e).__name__} — {str(e)[:300]}",
+                                  "trace": _tb.format_exc()[-800:]}
+            st.rerun()   # 대시보드 지표·표를 새 데이터로 갱신
+        li = ss.get("last_import")
+        if li:
+            if li.get("error"):
+                st.error(f"업로드 실패: {li['error']}")
+                if li.get("trace"):
+                    st.code(li["trace"])
+            elif li["nurseries"] == 0:
+                st.warning("⚠️ 등록된 농원이 없습니다. 파일 형식(CSV UTF-8)과 헤더를 확인하세요.")
+            else:
+                st.success(f"✅ 농원 {li['nurseries']}곳 · 취급식물 {li['stocks']}건 등록 완료")
+            if li.get("warnings"):
+                with st.expander(f"⚠️ 안내·경고 {len(li['warnings'])}건"):
+                    for w in li["warnings"][:80]:
+                        st.caption("· " + w)
+        st.caption("※ 배포 환경(Streamlit Cloud)은 앱 재시작 시 DB가 초기화될 수 있으니, "
+                   "영구 보관은 CSV 원본을 별도 보관하세요. 한글 윈도우 엑셀은 "
+                   "‘다른 이름으로 저장 → CSV UTF-8’로 저장하면 가장 안전합니다.")
+
 # ══════════════ 건강 진단 ══════════════
 elif page == "diag":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🔍 식물 건강 진단")
     t1, t2 = st.tabs(["📷 카메라로 촬영", "📁 파일 업로드"])
     with t1:
@@ -1633,21 +2000,69 @@ elif page == "diag":
 # ══════════════ 농원 지도 ══════════════
 elif page == "map":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🗺️ 농원 지도 (불로화훼단지)")
-    rows = conn.execute("SELECT id, name FROM nursery").fetchall()
-    rng = np.random.RandomState(7)
-    st.map({"lat": 35.9258 + rng.uniform(-0.002, 0.002, len(rows)),
-            "lon": 128.6390 + rng.uniform(-0.003, 0.003, len(rows))},
-           size=8, color="#2E7D32")
-    sel = st.selectbox("농원 선택", [f"{n} ({i}) · {zone_of(i)}" for i, n in rows])
-    st.markdown(f"<div class='nursery'>🌿 <b>{sel}</b><br>영업 09:00~18:00 · 취급: 관엽/다육 "
-                f"· 📞 053-98X-XXXX · 📱 QR 스탬프 입구 부착</div>", unsafe_allow_html=True)
+    try:
+        rows = conn.execute("SELECT id, name, COALESCE(address,''), COALESCE(phone,''), zone "
+                            "FROM nursery ORDER BY id").fetchall()
+    except sqlite3.OperationalError:
+        _ensure_admin_columns(conn)
+        rows = conn.execute("SELECT id, name, COALESCE(address,''), COALESCE(phone,''), zone "
+                            "FROM nursery ORDER BY id").fetchall()
+    if not rows:
+        st.info("등록된 농원이 없습니다.")
+    else:
+        # 농원별 '고정' 좌표(ID 해시 기반) — 재렌더에도 자리가 안 흔들림
+        def _coord(nid):
+            h = int(hashlib.md5(nid.encode()).hexdigest(), 16)
+            return (35.9258 + ((h % 1000) / 1000 - 0.5) * 0.004,
+                    128.6390 + (((h // 997) % 1000) / 1000 - 0.5) * 0.006)
+        info = {i: (n, a, p, z) for i, n, a, p, z in rows}
+
+        # 먼저 선택 → 그 값으로 지도를 그린다(선택이 지도에 반영되도록 순서 중요)
+        sel = st.selectbox("농원 선택", [f"{n} ({i})" for i, n, *_ in rows], key="map_sel")
+        sel_id = sel.split("(")[-1].rstrip(")")
+        slat, slon = _coord(sel_id)
+
+        pts = []
+        for i, n, a, p, z in rows:
+            la, lo = _coord(i)
+            is_sel = (i == sel_id)
+            pts.append({"name": n, "id": i, "lat": la, "lon": lo,
+                        "color": [231, 76, 60] if is_sel else [46, 125, 50],
+                        "rad": 34 if is_sel else 15})
+        try:
+            import pydeck as pdk
+            layer = pdk.Layer(
+                "ScatterplotLayer", data=pts, get_position="[lon, lat]",
+                get_fill_color="color", get_radius="rad",
+                radius_min_pixels=6, radius_max_pixels=40, pickable=True,
+                stroked=True, get_line_color=[255, 255, 255], line_width_min_pixels=1)
+            view = pdk.ViewState(latitude=slat, longitude=slon, zoom=16, pitch=0)
+            st.pydeck_chart(pdk.Deck(
+                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                layers=[layer], initial_view_state=view,
+                tooltip={"text": "{name} ({id})"}), use_container_width=True)
+        except Exception:
+            # pydeck 미지원 환경 폴백: 선택 농원을 빨간 큰 점으로 강조한 기본 지도
+            import pandas as _pd
+            df = _pd.DataFrame({"lat": [p["lat"] for p in pts],
+                                "lon": [p["lon"] for p in pts],
+                                "color": [p["color"] for p in pts],
+                                "size": [p["rad"] for p in pts]})
+            st.map(df, latitude="lat", longitude="lon", color="color", size="size")
+
+        n, a, p, z = info[sel_id]
+        addr = a or f"{z} · 불로화훼단지"
+        tel = f"📞 <a href='tel:{p}' style='color:#e91e63;text-decoration:none;font-weight:700'>{p}</a>" if p else "📞 053-000-0000"
+        st.markdown(f"<div class='nursery'>🌿 <b>{n}</b> ({sel_id})<br>"
+                    f"📍 {addr} · {tel}<br>영업 09:00~18:00 · QR 스탬프 입구 부착</div>",
+                    unsafe_allow_html=True)
 
 # ══════════════ 분갈이 특화 ══════════════
 elif page == "repot":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🪴 분갈이·화분 특화 농원")
     for nid, name in conn.execute(
             "SELECT id, name FROM nursery ORDER BY RANDOM() LIMIT 6").fetchall():
@@ -1658,7 +2073,7 @@ elif page == "repot":
 # ══════════════ 내 식물 관리 (물·영양) ══════════════
 elif page == "care":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 💧 내 식물 관리")
     st.caption("우리 집 식물의 물 주기·영양제 일정을 관리하세요.")
 
