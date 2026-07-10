@@ -1046,53 +1046,28 @@ NOTICES = [
     ("📅", "예약 확정 — 3/16(토) 14:00 대형 몬스테라 상담"),
     ("🌸", "신규 입고 — 올리브나무·아레카야자 대형목"),
 ]
-WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
-def season_weather(month):
-    """계절별 간이 날씨 + 식물 관리 팁(데모용). 실제 날씨 API 연동 가능."""
-    if month in (12, 1, 2):
-        return "❄️ 5°C 건조", "겨울엔 물주기 절반 · 창가 냉해 주의"
-    if month in (3, 4, 5):
-        return "🌤️ 18°C 온화", "봄 분갈이 적기 · 새순 성장기"
-    if month in (6, 7, 8):
-        return "☀️ 29°C 습함", "통풍·과습 주의 · 직사광 차광"
-    return "🍂 15°C 선선", "물주기 줄이고 실내로 이동 준비"
 
 def header():
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)  # 로고 상단 여백
     c1, c2 = st.columns([3, 2])
-    if asset("FL_Land.png"):
-        c1.image(asset("FL_Land.png"), width=230)
-    else:
-        c1.markdown("### 🌱 Flower Land <span style='font-size:13px;color:#777'>(플라워랜드)</span>",
-                    unsafe_allow_html=True)
+    logo = asset("FL_Land.png")
+    with c1:
+        # FL_Land.png 로고 자체가 홈 버튼 (탭하면 홈으로) — 화면당 로고 1개
+        if logo:
+            if clickable_image(logo, f"logohome_{page}", "230/84", fit="contain"):
+                go("home")
+        else:
+            if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
+                go("home")
     with c2:
         # 🔔 알림 벨 (신규 소식·예약 알림)
         with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=True):
             st.markdown("**📣 새 소식 · 예약 알림**")
             for ico, txt in NOTICES:
                 st.markdown(f"{ico} {txt}")
-        # 📅 오늘 날짜 · 날씨 · 관리 팁
-        now = datetime.now()
-        wx, tip = season_weather(now.month)
-        st.markdown(
-            f"<div style='text-align:right;font-size:11px;line-height:1.4;color:#666'>"
-            f"<b>{now.month}/{now.day}({WEEKDAYS[now.weekday()]})</b> {wx}<br>"
-            f"🌿 {tip}</div>", unsafe_allow_html=True)
 
 def home_button(page):
-    """홈 버튼: FL_Land.png 로고(클릭 시 홈)+'홈' 글자. 로고 파일 없으면 텍스트 버튼."""
-    logo = asset("FL_Land.png")
-    if not logo:
-        if st.button("🏠 홈", key=f"home_{page}"):
-            go("home")
-        return
-    c1, c2, _ = st.columns([2, 1, 6])
-    with c1:
-        clicked = clickable_image(logo, f"homebtn_{page}", "150/56", fit="contain")
-    c2.markdown("<div style='padding-top:9px;font-weight:800;color:#2E7D32;"
-                "font-size:15px'>홈</div>", unsafe_allow_html=True)
-    if clicked:
-        go("home")
+    pass   # 홈 버튼 제거: 이제 헤더의 FL_Land.png 로고 자체가 홈 버튼
 
 page = ss.page
 
@@ -1420,20 +1395,30 @@ elif page == "search":
         term = q.strip()
         hits = [(pid, nm) for pid, nm in PLANT_NAMES.items() if term in nm]
 
-        # 품종 확정: DB 매칭 우선, 없으면 None(=미등록)
-        pid = None
-        if hits:
-            pid = (st.radio("품종 선택", [h[0] for h in hits],
-                            format_func=lambda p: PLANT_NAMES[p], horizontal=True)
-                   if len(hits) > 1 else hits[0][0])
-            disp_name = PLANT_NAMES[pid]
-        else:
-            disp_name = term
+        hit_pids = [h[0] for h in hits]
+        # 새 검색어면 품종 선택 초기화(옵션 불일치 방지)
+        if ss.get("search_term_seen") != term:
+            ss.search_term_seen = term
+            ss.pop("variety_pick", None)
 
-        # ── 품종을 고르면 바로 카탈로그 이미지 표시 (핀치/휠로 크기 조절) ──
-        if pid:
+        pid = None
+        disp_name = term
+        if hit_pids:
+            # 이미지를 이름(품종 선택) 위에 먼저 그리기 위해 현재 품종을 미리 결정
+            cur = ss.get("variety_pick")
+            pid = cur if cur in hit_pids else hit_pids[0]
+            disp_name = PLANT_NAMES[pid]
+
+            # ── 카탈로그 이미지: 식물 검색 아래 · 식물 이름 위 (핀치로 크기 조절) ──
             st.markdown("### 🖼️ 카탈로그 이미지")
             pinch_image(pid)
+
+            # ── 품종(식물 이름) 선택 ──
+            if len(hit_pids) > 1:
+                pid = st.radio("품종 선택", hit_pids,
+                               format_func=lambda p: PLANT_NAMES[p],
+                               horizontal=True, key="variety_pick")
+                disp_name = PLANT_NAMES[pid]
 
         # ── ① API(제미나이): 식물 유형·소개 ──────────────────────
         st.markdown("### 🌿 식물 소개")
