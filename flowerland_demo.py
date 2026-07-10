@@ -100,7 +100,7 @@ h1,h2,h3 {{ color:{GREEN}; }}
 /* ── 헤더 알림 버튼: 컬럼을 채우는 흰색 둥근 박스 (스크린샷과 동일) ── */
 [data-testid="stPopover"] button {{
     background:#ffffff !important; border:1px solid #e3e3e3 !important;
-    border-radius:16px !important; min-height:52px !important;
+    border-radius:16px !important; min-height:46px !important;
     font-weight:700 !important; color:#2E5D32 !important;
     box-shadow:0 1px 3px rgba(0,0,0,.04) !important;
 }}
@@ -1285,7 +1285,7 @@ def header():
         if logo:
             if clickable_image(logo, f"logohome_{page}", aspect="300/96",
                                fit="contain", bg="#EFF1EF", pad="8px 14px",
-                               pos="left center", height="50px", hug=True):
+                               pos="left center", height="43px", hug=True):
                 go("home")
         else:
             if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
