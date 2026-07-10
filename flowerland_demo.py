@@ -97,6 +97,20 @@ h1,h2,h3 {{ color:{GREEN}; }}
            padding:8px 12px; margin-top:6px; font-size:14px; }}
 .stampbn {{ background:#e9f6e9; border-radius:12px; padding:10px 14px; font-weight:700; }}
 
+/* ── 헤더 알림 버튼: 오른쪽 정렬 컴팩트 알약 (빈 흰 박스처럼 커지지 않게) ── */
+[data-testid="stPopover"] {{ display:flex; justify-content:flex-end; }}
+[data-testid="stPopover"] button {{
+    background:#ffffff !important; border:1px solid #e3e3e3 !important;
+    border-radius:14px !important; padding:.55rem 1.1rem !important;
+    min-height:0 !important; width:auto !important; white-space:nowrap !important;
+    font-weight:700 !important; color:#2E5D32 !important;
+    box-shadow:0 1px 3px rgba(0,0,0,.05) !important;
+}}
+[data-testid="stPopover"] button:hover {{
+    border-color:{GREEN} !important;
+    box-shadow:0 3px 10px rgba(46,125,50,.20) !important; transition:all .15s;
+}}
+
 /* ── '홈으로' 버튼 전용: 파란색 강조 + 크게 (key='home_*'만 타겟) ── */
 [class*="st-key-home_"] button {{
     background: #1565C0 !important;
@@ -220,18 +234,33 @@ def gemini_on():
 NAME_TO_PID = {}  # PLANT_NAMES 정의 후 아래에서 채움
 
 # ── 데이터 ───────────────────────────────────────────────────────────────────
-# 식물 마스터 1001종: plants_master.csv (PID·한글명·영문명·학명) 을 로드.
+# 식물 마스터(최대 3,002종): plants_master_v3.csv 등을 자동 선택해 로드.
 # dispatch.db 는 이 PID 체계로 traffic_dispatch.seed() 가 재고를 생성한다.
 import csv as _csv
 
 _MASTER = []                 # [{pid,korean,english_common,scientific,category}, ...]
-_MASTER_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plants_master.csv")
-try:
-    with open(_MASTER_CSV, encoding="utf-8") as _f:
+# 마스터 CSV 자동 선택: 최신본(v3=3002종)이 있으면 우선, 없으면 v2 → 기본순.
+#   파일명만 맞으면 검색·이미지·추천이 자동으로 전체 종에 적용된다.
+#   (이미지는 assets/plants/{PID}.png 를 PID 그대로 찾으므로 4자리 신규 PID도 정상)
+_BASE = os.path.dirname(os.path.abspath(__file__))
+_MASTER_CANDIDATES = [
+    "plants_master_v3.csv",        # 3,002종 (최신)
+    "plants_master_v2.csv",        # 2,001종
+    "plants_master.csv",           # 1,001종 (기존)
+]
+_MASTER_CSV = next((os.path.join(_BASE, _n)
+                    for _n in _MASTER_CANDIDATES
+                    if os.path.exists(os.path.join(_BASE, _n))), None)
+if _MASTER_CSV:
+    # utf-8-sig 로 열어 엑셀 저장(BOM) 파일도 안전하게 읽는다.
+    with open(_MASTER_CSV, encoding="utf-8-sig") as _f:
         for _r in _csv.DictReader(_f):
-            _MASTER.append(_r)
-except FileNotFoundError:
-    # CSV가 없을 때의 최소 폴백(앱이 죽지 않게)
+            # 열 이름 앞뒤 공백/누락 방어
+            _row = {(_k or "").strip(): (_v or "").strip() for _k, _v in _r.items()}
+            if _row.get("pid"):
+                _MASTER.append(_row)
+if not _MASTER:
+    # CSV가 없거나 비었을 때의 최소 폴백(앱이 죽지 않게)
     _MASTER = [{"pid": "P001", "korean": "몬스테라", "english_common": "Monstera",
                 "scientific": "Monstera deliciosa", "category": "관엽 Foliage"}]
 
@@ -337,13 +366,42 @@ def _ensure_admin_columns(conn):
 
 conn = get_conn()
 
+def _rebuild_db():
+    """스키마 불일치(OperationalError)로 쿼리가 깨질 때 호출.
+    배포된 dispatch.db를 폐기하고 현재 traffic_dispatch.py 스키마로 새로 생성한다.
+    (레포에 커밋된 옛 스키마 DB가 배포되는 경우 등을 자가복구)"""
+    global conn
+    try:
+        conn.close()
+    except Exception:
+        pass
+    try:
+        if os.path.exists(td.DB_PATH):
+            os.remove(td.DB_PATH)
+    except Exception:
+        pass
+    try:
+        get_conn.clear()          # @st.cache_resource 캐시 비우기 → 다음 호출 시 재생성
+    except Exception:
+        pass
+    conn = get_conn()
+    return conn
+
 def zone_of(nid):
     n = int(nid[1:])
     return f"{'ABCD'[n % 4]}-{n % 20 + 1:02d} 구역"
 
 def best_nursery(pid, source):
     """실제 트래픽 분배 알고리즘으로 최우수 매칭 농원 1곳 선정"""
-    ids = td.select_nurseries(conn, pid, k=1, source=source)
+    try:
+        ids = td.select_nurseries(conn, pid, k=1, source=source)
+    except sqlite3.OperationalError:
+        # dispatch.db 스키마가 traffic_dispatch.py와 어긋남 → DB 재생성 후 1회 재시도
+        _rebuild_db()
+        try:
+            ids = td.select_nurseries(conn, pid, k=1, source=source)
+        except sqlite3.OperationalError:
+            return None       # 재생성 후에도 실패하면 traffic_dispatch.py 자체 수정 필요
     if not ids:
         return None
     nid = ids[0]
@@ -519,23 +577,42 @@ def _b64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-def clickable_image(path, key, aspect="351/416", fit="100% 100%", frame=True):
+def clickable_image(path, key, aspect="351/416", fit="100% 100%", frame=True,
+                    bg=None, pad=None, pos="center", height=None, hug=False):
     """이미지 전체가 버튼으로 동작. 클릭하면 True 반환 (세션 유지됨).
     fit="contain"이면 종횡비를 유지한 채 카드 안에 맞춤 (TOP5 일러스트용).
-    frame=False면 테두리·배경 없이 이미지만 (로고 등 여백 제거용)."""
-    box = ("border-radius: 16px; border: 1px solid #e3e3e3;" if frame
-           else "border: none; background-color: transparent;")
-    hov = ("border-color: {g}; box-shadow: 0 3px 12px rgba(46,125,50,.30); "
-           "transform: translateY(-1px);".format(g=GREEN) if frame else "opacity: .82;")
+    frame=False면 테두리·배경 없이 이미지만 (로고 등 여백 제거용).
+    bg 지정 시 그 색의 둥근 박스 안에 이미지를 넣는다 (로고 회색 박스 등).
+    pad=안쪽 여백, pos=이미지 정렬(예 'left center'),
+    height=고정 높이(지정 시 aspect 대신 사용).
+    hug=True면 컬럼을 꽉 채우지 않고 내용(=height×aspect) 폭으로 줄인다(로고 카드용)."""
+    if bg is not None:                                   # 회색 등 색상 박스
+        box = f"border-radius: 16px; border: 1px solid {bg}; background-color: {bg};"
+        hov = "filter: brightness(.97); transform: translateY(-1px);"
+    elif frame:                                          # 기본: 흰 배경 + 테두리
+        box = "border-radius: 16px; border: 1px solid #e3e3e3;"
+        hov = ("border-color: {g}; box-shadow: 0 3px 12px rgba(46,125,50,.30); "
+               "transform: translateY(-1px);".format(g=GREEN))
+    else:                                                # 테두리·배경 없음
+        box = "border: none; background-color: transparent;"
+        hov = "opacity: .82;"
+    if hug and height:      # 내용 폭으로 축소: 높이 고정 + aspect로 폭 자동
+        size_rule = f"height: {height}; aspect-ratio: {aspect}; width: auto;"
+    elif height:
+        size_rule = f"height: {height}; width: 100%;"
+    else:
+        size_rule = f"aspect-ratio: {aspect}; height: auto; width: 100%;"
+    pad_rule  = f"padding: {pad}; background-origin: content-box;" if pad else ""
+    bgcolor   = f" {bg}" if bg else ""
     st.markdown(f"""<style>
     .st-key-{key} button {{
-        background: url("data:image/png;base64,{_b64(path)}") center / {fit} no-repeat;
-        width: 100%; aspect-ratio: {aspect}; height: auto; {box}
+        background: url("data:image/png;base64,{_b64(path)}") {pos} / {fit} no-repeat{bgcolor};
+        {size_rule} {box} {pad_rule}
     }}
     .st-key-{key} button:hover {{ {hov} transition: all .15s; }}
     .st-key-{key} button p, .st-key-{key} button div {{ color: transparent !important; }}
     </style>""", unsafe_allow_html=True)
-    return st.button("\u200b", key=key, use_container_width=True)
+    return st.button("\u200b", key=key, use_container_width=(not hug))
 
 PLANT_ILLUST = {"P001": "1_MON.png",  "P002": "2_SKIN.png", "P003": "3_Cal.png",
                 "P008": "4_SANSE.png", "P026": "5_BOS_GO.png"}
@@ -1180,26 +1257,27 @@ NOTICES = [
 
 def header():
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)  # 로고 상단 여백
-    c1, c2 = st.columns([5, 2], vertical_alignment="center")  # 로고 높이에 맞춰 세로 가운데
-    logo = asset("FL_Land.png")
+    c1, c2 = st.columns([1, 1], vertical_alignment="center")  # 로고↔알림 세로 가운데
+    logo = asset("Flower_land.png")
     with c1:
-        # FL_Land.png 로고 자체가 홈 버튼 (탭하면 홈으로) — 테두리·여백 없이 로고만
+        # Flower_land.png 로고 = 홈 버튼. 내용 폭에 맞춘 컴팩트 회색 카드(왼쪽 배치)
         if logo:
-            if clickable_image(logo, f"logohome_{page}", "300/96",
-                               fit="contain", frame=False):
+            if clickable_image(logo, f"logohome_{page}", aspect="300/96",
+                               fit="contain", bg="#EFF1EF", pad="8px 14px",
+                               pos="left center", height="60px", hug=True):
                 go("home")
         else:
             if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
                 go("home")
     with c2:
-        # 🔔 알림 벨 (신규 소식·예약 알림)
-        with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=True):
+        # 🔔 알림 벨 — 오른쪽 정렬 컴팩트 알약 (use_container_width=False로 내용 폭)
+        with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=False):
             st.markdown("**📣 새 소식 · 예약 알림**")
             for ico, txt in NOTICES:
                 st.markdown(f"{ico} {txt}")
 
 def home_button(page):
-    pass   # 홈 버튼 제거: 이제 헤더의 FL_Land.png 로고 자체가 홈 버튼
+    pass   # 홈 버튼 제거: 이제 헤더의 Flower_land.png 로고 자체가 홈 버튼
 
 page = ss.page
 
