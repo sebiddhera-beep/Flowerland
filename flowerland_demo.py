@@ -688,7 +688,7 @@ def interactive_card(img_bytes, pid, copy_text, score, greeting,
       <div style="background:#2E7D32; color:#fff; padding:14px 18px; font-size:19px; font-weight:800;">
         🌱 Flower Land (플라워랜드)</div>
       <div id="canvas" style="position:relative; width:100%; height:300px; background:#e8f5e9;
-           touch-action:none; user-select:none; overflow:hidden;">
+           touch-action:pan-y; user-select:none; overflow:hidden;">
         <img id="selfie" src="data:image/jpeg;base64,{selfie_b64}"
              style="position:absolute; left:5%; top:50%; transform:translateY(-50%);
                     width:40%; height:auto; border-radius:6px; pointer-events:none;">
@@ -712,7 +712,7 @@ def interactive_card(img_bytes, pid, copy_text, score, greeting,
          font-size:17px; font-weight:800; padding:13px; border-radius:12px; cursor:pointer;">
          📤 결과 공유하기 (카드 PNG 저장)</button>
       <div style="color:#888; font-size:12px; margin-top:7px;">
-         👆 식물을 끌어서 이동 · 두 손가락(또는 휠)으로 크기 조절</div>
+         ✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 &nbsp;(PC: 드래그 이동·휠 크기)</div>
     </div>
     <script>
     (function(){{
@@ -733,21 +733,29 @@ def interactive_card(img_bytes, pid, copy_text, score, greeting,
       window.addEventListener('mouseup',ed);
       canvas.addEventListener('wheel',e=>{{ scale=Math.min(95,Math.max(12,
         scale-Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
-      let pinch=0, s0={init_s};
+      let pinch=0, s0={init_s}, px0=0, py0=0, mx0=0, my0=0;
       function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
         return Math.hypot(dx,dy); }}
+      function mid(t){{ return {{x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}}; }}
       canvas.addEventListener('touchstart',e=>{{
-        if(e.touches.length===1) sd(e.touches[0].clientX,e.touches[0].clientY);
-        else if(e.touches.length===2){{ dragging=false; pinch=dist(e.touches); s0=scale; }}
-        e.preventDefault();
+        if(e.touches.length===2){{                          // 두 손가락: 크기+위치 조작
+          const r=rect(), m=mid(e.touches);
+          dragging=false; pinch=dist(e.touches); s0=scale;
+          px0=px; py0=py; mx0=(m.x-r.left)/r.width*100; my0=(m.y-r.top)/r.height*100;
+          e.preventDefault();
+        }}                                                  // 한 손가락은 가로채지 않음 → 페이지 스크롤
       }},{{passive:false}});
       canvas.addEventListener('touchmove',e=>{{
-        if(e.touches.length===1) mv(e.touches[0].clientX,e.touches[0].clientY);
-        else if(e.touches.length===2&&pinch>0){{ scale=Math.min(95,Math.max(12,
-          s0*(dist(e.touches)/pinch))); apply(); }}
-        e.preventDefault();
+        if(e.touches.length===2 && pinch>0){{
+          const r=rect(), m=mid(e.touches);
+          scale=Math.min(95,Math.max(12, s0*(dist(e.touches)/pinch)));
+          const mx=(m.x-r.left)/r.width*100, my=(m.y-r.top)/r.height*100;
+          px=Math.min(98,Math.max(2, px0+(mx-mx0)));
+          py=Math.min(98,Math.max(2, py0+(my-my0)));
+          apply(); e.preventDefault();
+        }}                                                  // 한 손가락은 스크롤
       }},{{passive:false}});
-      canvas.addEventListener('touchend',e=>{{ if(e.touches.length===0){{ed(); pinch=0;}} }});
+      canvas.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
       apply();
       document.getElementById('save').addEventListener('click',function(){{
         const btn=document.getElementById('save'); btn.textContent='⏳ 카드 생성 중...';
@@ -779,7 +787,7 @@ def pinch_image(pid, init_size=62, height=340):
     components.html(f"""
     <div id="box" style="position:relative; width:100%; height:{height-46}px;
          background:#f5faf5; border:1px solid #dcecdc; border-radius:12px;
-         touch-action:none; user-select:none; overflow:hidden;">
+         touch-action:pan-y; user-select:none; overflow:hidden;">
       <img id="img" src="data:image/png;base64,{img_b64}"
            style="position:absolute; left:50%; top:50%; width:{init_size}%; height:auto;
                   transform:translate(-50%,-50%); cursor:grab;
@@ -787,7 +795,7 @@ def pinch_image(pid, init_size=62, height=340):
     </div>
     <div style="text-align:center; color:#888; font-size:12px; margin-top:7px;
          font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;">
-       👆 두 손가락(또는 마우스 휠)으로 크기 조절 · 끌어서 이동</div>
+       ✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 &nbsp;(PC: 드래그 이동·휠 크기)</div>
     <script>
     (function(){{
       const box=document.getElementById('box'), img=document.getElementById('img');
@@ -806,21 +814,29 @@ def pinch_image(pid, init_size=62, height=340):
       window.addEventListener('mouseup',ed);
       box.addEventListener('wheel',e=>{{ scale=Math.min(170,Math.max(15,
         scale-Math.sign(e.deltaY)*4)); apply(); e.preventDefault(); }},{{passive:false}});
-      let pinch=0, s0={init_size};
+      let pinch=0, s0={init_size}, px0=0, py0=0, mx0=0, my0=0;
       function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
         return Math.hypot(dx,dy); }}
+      function mid(t){{ return {{x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}}; }}
       box.addEventListener('touchstart',e=>{{
-        if(e.touches.length===1) sd(e.touches[0].clientX,e.touches[0].clientY);
-        else if(e.touches.length===2){{ dragging=false; pinch=dist(e.touches); s0=scale; }}
-        e.preventDefault();
+        if(e.touches.length===2){{
+          const r=rect(), m=mid(e.touches);
+          dragging=false; pinch=dist(e.touches); s0=scale;
+          px0=px; py0=py; mx0=(m.x-r.left)/r.width*100; my0=(m.y-r.top)/r.height*100;
+          e.preventDefault();
+        }}                                                  // 한 손가락 → 페이지 스크롤
       }},{{passive:false}});
       box.addEventListener('touchmove',e=>{{
-        if(e.touches.length===1) mv(e.touches[0].clientX,e.touches[0].clientY);
-        else if(e.touches.length===2&&pinch>0){{ scale=Math.min(170,Math.max(15,
-          s0*(dist(e.touches)/pinch))); apply(); }}
-        e.preventDefault();
+        if(e.touches.length===2 && pinch>0){{
+          const r=rect(), m=mid(e.touches);
+          scale=Math.min(170,Math.max(15, s0*(dist(e.touches)/pinch)));
+          const mx=(m.x-r.left)/r.width*100, my=(m.y-r.top)/r.height*100;
+          px=Math.min(98,Math.max(2, px0+(mx-mx0)));
+          py=Math.min(98,Math.max(2, py0+(my-my0)));
+          apply(); e.preventDefault();
+        }}
       }},{{passive:false}});
-      box.addEventListener('touchend',e=>{{ if(e.touches.length===0){{ed(); pinch=0;}} }});
+      box.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
       apply();
     }})();
     </script>
@@ -1230,8 +1246,8 @@ elif page == "space":
                     if st.button("🔄 다시 합성하기", use_container_width=True):
                         ss.comp_key = None; st.rerun()
         else:
-            st.caption("👆 식물을 손가락으로 끌어 옮기고, 두 손가락으로 크기를 조절한 뒤 "
-                       "‘이 위치로 확정’을 누르세요. (마우스는 드래그 이동, 휠로 크기)")
+            st.caption("✌️ 두 손가락으로 식물의 크기·위치를 조절한 뒤 ‘이 위치로 확정’을 누르세요. "
+                       "한 손가락은 화면 스크롤. (PC는 드래그 이동, 휠로 크기)")
             # 서버가 이전에 확정한 값이 있으면 초기 위치로 사용
             init_x = ss.get("mx", 50); init_y = ss.get("my", 60); init_s = ss.get("msc", 38)
             # 배경(공간 사진) + 식물 이미지를 base64로 브라우저에 전달 → 실시간 조작
@@ -1248,7 +1264,7 @@ elif page == "space":
 
             components.html(f"""
             <div id="stage" style="position:relative; width:100%; max-width:700px;
-                 margin:0 auto; touch-action:none; user-select:none; border-radius:12px;
+                 margin:0 auto; touch-action:pan-y; user-select:none; border-radius:12px;
                  overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.15);">
               <img id="bg" src="data:image/jpeg;base64,{bg_b64}"
                    style="width:100%; display:block; pointer-events:none;">
@@ -1258,7 +1274,7 @@ elif page == "space":
                           filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));">
               <div style="position:absolute; left:8px; bottom:8px; background:rgba(46,125,50,.85);
                    color:#fff; font-size:12px; padding:3px 9px; border-radius:8px;">
-                {PLANT_NAMES[pid]} — 끌어서 이동 · 두 손가락/휠로 크기</div>
+                {PLANT_NAMES[pid]} — 두 손가락으로 크기·위치 · 한 손가락은 스크롤</div>
             </div>
             <div style="text-align:center; margin-top:10px;">
               <button id="confirm" style="background:#2e7d32; color:#fff; border:none;
@@ -1289,22 +1305,29 @@ elif page == "space":
               window.addEventListener('mouseup',endDrag);
               stage.addEventListener('wheel',e=>{{ scale=Math.min(90,Math.max(10,
                 scale - Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
-              let pinchStart=0, scaleStart={init_s};
+              let pinchStart=0, scaleStart={init_s}, px0=0, py0=0, mx0=0, my0=0;
               function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
                 return Math.hypot(dx,dy); }}
+              function mid(t){{ return {{x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}}; }}
               stage.addEventListener('touchstart',e=>{{
-                if(e.touches.length===1){{ startDrag(e.touches[0].clientX,e.touches[0].clientY); }}
-                else if(e.touches.length===2){{ dragging=false; pinchStart=dist(e.touches);
-                  scaleStart=scale; }}
-                e.preventDefault();
+                if(e.touches.length===2){{                       // 두 손가락: 크기+위치
+                  const r=rect(), m=mid(e.touches);
+                  dragging=false; pinchStart=dist(e.touches); scaleStart=scale;
+                  px0=px; py0=py; mx0=(m.x-r.left)/r.width*100; my0=(m.y-r.top)/r.height*100;
+                  e.preventDefault();
+                }}                                               // 한 손가락은 페이지 스크롤
               }},{{passive:false}});
               stage.addEventListener('touchmove',e=>{{
-                if(e.touches.length===1){{ moveDrag(e.touches[0].clientX,e.touches[0].clientY); }}
-                else if(e.touches.length===2 && pinchStart>0){{
-                  scale=Math.min(90,Math.max(10, scaleStart*(dist(e.touches)/pinchStart))); apply(); }}
-                e.preventDefault();
+                if(e.touches.length===2 && pinchStart>0){{
+                  const r=rect(), m=mid(e.touches);
+                  scale=Math.min(90,Math.max(10, scaleStart*(dist(e.touches)/pinchStart)));
+                  const mx=(m.x-r.left)/r.width*100, my=(m.y-r.top)/r.height*100;
+                  px=Math.min(95,Math.max(5, px0+(mx-mx0)));
+                  py=Math.min(95,Math.max(5, py0+(my-my0)));
+                  apply(); e.preventDefault();
+                }}
               }},{{passive:false}});
-              stage.addEventListener('touchend',e=>{{ if(e.touches.length===0){{endDrag();pinchStart=0;}} }});
+              stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinchStart=0; }} }});
               // ── 확정: 부모(Streamlit) URL에 값 실어 새로고침 → 서버가 읽어 합성 ──
               document.getElementById('confirm').addEventListener('click',function(){{
                 const p = window.parent;
