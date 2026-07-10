@@ -1633,26 +1633,26 @@ elif page == "admin":
 
         # --- 내 노출 현황 ---
         with tab3:
-            since = (datetime.now() - timedelta(days=7)).isoformat()
-            mine = conn.execute("SELECT COUNT(*) FROM exposure_log WHERE nursery_id=? AND ts>=?",
-                                (nid, since)).fetchone()[0]
-            allc = conn.execute("SELECT COUNT(*) FROM exposure_log WHERE ts>=?", (since,)).fetchone()[0]
-            avg = allc / 80 if allc else 0
-            ef = conn.execute("SELECT expo_factor FROM nursery WHERE id=?", (nid,)).fetchone()[0]
+            n_nur = conn.execute("SELECT COUNT(*) FROM nursery").fetchone()[0] or 1
+            mine = conn.execute("SELECT COALESCE(SUM(cnt),0) FROM dispatch_log WHERE nursery_id=?",
+                                (nid,)).fetchone()[0]
+            allc = conn.execute("SELECT COALESCE(SUM(cnt),0) FROM dispatch_log").fetchone()[0]
+            avg = allc / n_nur if allc else 0
+            mystock = conn.execute("SELECT COUNT(DISTINCT plant_id) FROM stock WHERE nursery_id=?",
+                                   (nid,)).fetchone()[0]
             c1, c2, c3 = st.columns(3)
-            c1.metric("주간 추천 노출", f"{mine}회")
+            c1.metric("누적 추천 노출", f"{mine}회")
             c2.metric("단지 평균 대비", f"{(mine/avg*100 if avg else 0):.0f}%")
-            c3.metric("현재 노출 가중치", f"{ef:.2f}")
-            st.caption("재고를 자주 갱신할수록(신선도 유지) 노출 가중치가 올라갑니다. "
-                       "가중치는 매일 04시 자동 재계산됩니다.")
+            c3.metric("등록 식물 수", f"{mystock}종")
+            st.caption("재고를 많이·자주 등록할수록 추천 노출 기회가 늘어납니다. "
+                       "추천 분배는 재고량과 최근 배정 이력으로 실시간 계산됩니다.")
 
     # ══ 상인회 마스터 대시보드 ══
     elif ss.is_master:
         st.markdown("### 📊 상인회 통합 대시보드")
-        since = (datetime.now() - timedelta(days=7)).isoformat()
         counts = dict(conn.execute(
-            "SELECT nursery_id, COUNT(*) FROM exposure_log WHERE ts>=? GROUP BY nursery_id",
-            (since,)).fetchall())
+            "SELECT nursery_id, COALESCE(SUM(cnt),0) FROM dispatch_log GROUP BY nursery_id"
+            ).fetchall())
         allids = [r[0] for r in conn.execute("SELECT id FROM nursery").fetchall()]
         vals = [counts.get(i, 0) for i in allids]
         import numpy as _np
@@ -1665,7 +1665,7 @@ elif page == "admin":
         c1, c2, c3 = st.columns(3)
         c1.metric("지니계수", f"{g:.3f}", "목표 ≤0.35 " + ("✅" if g <= 0.35 else "⚠️"))
         c2.metric("커버리지", f"{cov*100:.0f}%", "목표 ≥85% " + ("✅" if cov >= 0.85 else "⚠️"))
-        c3.metric("주간 총 노출", f"{sum(vals)}회")
+        c3.metric("누적 추천 노출", f"{sum(vals)}회")
         st.divider()
         st.markdown("#### 농원별 노출 · 등록 식물 수 (상위/하위)")
         stat = conn.execute("""SELECT n.id, n.name, COUNT(DISTINCT s.plant_id) plants,
@@ -1677,7 +1677,7 @@ elif page == "admin":
             "농원":[f"{r[1]}" if r[0]!="..." else "..." for r in rows_show],
             "등록식물":[r[2] for r in rows_show],
             "총재고":[r[3] for r in rows_show],
-            "주간노출":[counts.get(r[0],0) if r[0]!="..." else "..." for r in rows_show],
+            "추천노출":[counts.get(r[0],0) if r[0]!="..." else "..." for r in rows_show],
         }, height=430)
         st.caption("미등록·저노출 농원을 파악해 재고 등록을 독려하세요. "
                    "노출 편중이 심하면(지니↑) 알고리즘이 자동 보정합니다.")
