@@ -97,6 +97,18 @@ h1,h2,h3 {{ color:{GREEN}; }}
            padding:8px 12px; margin-top:6px; font-size:14px; }}
 .stampbn {{ background:#e9f6e9; border-radius:12px; padding:10px 14px; font-weight:700; }}
 
+/* ── 헤더 알림 버튼: 흰색 둥근 박스 (좌측 로고 회색 박스와 높이 정렬) ── */
+[data-testid="stPopover"] button {{
+    background:#ffffff !important; border:1px solid #e3e3e3 !important;
+    border-radius:16px !important; min-height:84px !important;
+    font-weight:700 !important; color:#2E5D32 !important;
+    box-shadow:0 1px 3px rgba(0,0,0,.04) !important;
+}}
+[data-testid="stPopover"] button:hover {{
+    border-color:{GREEN} !important;
+    box-shadow:0 3px 10px rgba(46,125,50,.20) !important; transition:all .15s;
+}}
+
 /* ── '홈으로' 버튼 전용: 파란색 강조 + 크게 (key='home_*'만 타겟) ── */
 [class*="st-key-home_"] button {{
     background: #1565C0 !important;
@@ -352,13 +364,42 @@ def _ensure_admin_columns(conn):
 
 conn = get_conn()
 
+def _rebuild_db():
+    """스키마 불일치(OperationalError)로 쿼리가 깨질 때 호출.
+    배포된 dispatch.db를 폐기하고 현재 traffic_dispatch.py 스키마로 새로 생성한다.
+    (레포에 커밋된 옛 스키마 DB가 배포되는 경우 등을 자가복구)"""
+    global conn
+    try:
+        conn.close()
+    except Exception:
+        pass
+    try:
+        if os.path.exists(td.DB_PATH):
+            os.remove(td.DB_PATH)
+    except Exception:
+        pass
+    try:
+        get_conn.clear()          # @st.cache_resource 캐시 비우기 → 다음 호출 시 재생성
+    except Exception:
+        pass
+    conn = get_conn()
+    return conn
+
 def zone_of(nid):
     n = int(nid[1:])
     return f"{'ABCD'[n % 4]}-{n % 20 + 1:02d} 구역"
 
 def best_nursery(pid, source):
     """실제 트래픽 분배 알고리즘으로 최우수 매칭 농원 1곳 선정"""
-    ids = td.select_nurseries(conn, pid, k=1, source=source)
+    try:
+        ids = td.select_nurseries(conn, pid, k=1, source=source)
+    except sqlite3.OperationalError:
+        # dispatch.db 스키마가 traffic_dispatch.py와 어긋남 → DB 재생성 후 1회 재시도
+        _rebuild_db()
+        try:
+            ids = td.select_nurseries(conn, pid, k=1, source=source)
+        except sqlite3.OperationalError:
+            return None       # 재생성 후에도 실패하면 traffic_dispatch.py 자체 수정 필요
     if not ids:
         return None
     nid = ids[0]
@@ -534,18 +575,32 @@ def _b64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-def clickable_image(path, key, aspect="351/416", fit="100% 100%", frame=True):
+def clickable_image(path, key, aspect="351/416", fit="100% 100%", frame=True,
+                    bg=None, pad=None, pos="center", height=None):
     """이미지 전체가 버튼으로 동작. 클릭하면 True 반환 (세션 유지됨).
     fit="contain"이면 종횡비를 유지한 채 카드 안에 맞춤 (TOP5 일러스트용).
-    frame=False면 테두리·배경 없이 이미지만 (로고 등 여백 제거용)."""
-    box = ("border-radius: 16px; border: 1px solid #e3e3e3;" if frame
-           else "border: none; background-color: transparent;")
-    hov = ("border-color: {g}; box-shadow: 0 3px 12px rgba(46,125,50,.30); "
-           "transform: translateY(-1px);".format(g=GREEN) if frame else "opacity: .82;")
+    frame=False면 테두리·배경 없이 이미지만 (로고 등 여백 제거용).
+    bg 지정 시 그 색의 둥근 박스 안에 이미지를 넣는다 (로고 회색 박스 등).
+    pad=안쪽 여백, pos=이미지 정렬(예 'left center'),
+    height=고정 높이(지정 시 aspect 대신 사용)."""
+    if bg is not None:                                   # 회색 등 색상 박스
+        box = f"border-radius: 16px; border: 1px solid {bg}; background-color: {bg};"
+        hov = "filter: brightness(.97); transform: translateY(-1px);"
+    elif frame:                                          # 기본: 흰 배경 + 테두리
+        box = "border-radius: 16px; border: 1px solid #e3e3e3;"
+        hov = ("border-color: {g}; box-shadow: 0 3px 12px rgba(46,125,50,.30); "
+               "transform: translateY(-1px);".format(g=GREEN))
+    else:                                                # 테두리·배경 없음
+        box = "border: none; background-color: transparent;"
+        hov = "opacity: .82;"
+    size_rule = (f"height: {height};" if height
+                 else f"aspect-ratio: {aspect}; height: auto;")
+    pad_rule  = f"padding: {pad}; background-origin: content-box;" if pad else ""
+    bgcolor   = f" {bg}" if bg else ""
     st.markdown(f"""<style>
     .st-key-{key} button {{
-        background: url("data:image/png;base64,{_b64(path)}") center / {fit} no-repeat;
-        width: 100%; aspect-ratio: {aspect}; height: auto; {box}
+        background: url("data:image/png;base64,{_b64(path)}") {pos} / {fit} no-repeat{bgcolor};
+        width: 100%; {size_rule} {box} {pad_rule}
     }}
     .st-key-{key} button:hover {{ {hov} transition: all .15s; }}
     .st-key-{key} button p, .st-key-{key} button div {{ color: transparent !important; }}
@@ -1196,12 +1251,13 @@ NOTICES = [
 def header():
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)  # 로고 상단 여백
     c1, c2 = st.columns([5, 2], vertical_alignment="center")  # 로고 높이에 맞춰 세로 가운데
-    logo = asset("FL_Land.png")
+    logo = asset("Flower_land.png")
     with c1:
-        # FL_Land.png 로고 자체가 홈 버튼 (탭하면 홈으로) — 테두리·여백 없이 로고만
+        # Flower_land.png 로고 = 홈 버튼. 목업처럼 연회색 둥근 박스 안에 왼쪽 정렬
         if logo:
-            if clickable_image(logo, f"logohome_{page}", "300/96",
-                               fit="contain", frame=False):
+            if clickable_image(logo, f"logohome_{page}", fit="contain",
+                               bg="#F1F2F1", pad="12px 18px",
+                               pos="left center", height="84px"):
                 go("home")
         else:
             if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
@@ -1214,7 +1270,7 @@ def header():
                 st.markdown(f"{ico} {txt}")
 
 def home_button(page):
-    pass   # 홈 버튼 제거: 이제 헤더의 FL_Land.png 로고 자체가 홈 버튼
+    pass   # 홈 버튼 제거: 이제 헤더의 Flower_land.png 로고 자체가 홈 버튼
 
 page = ss.page
 

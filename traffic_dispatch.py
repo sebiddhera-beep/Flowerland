@@ -30,18 +30,33 @@ _MASTER_CSV = next((os.path.join(_BASE_DIR, _n)
 
 # 스키마 버전: 구조가 바뀌면 이 숫자를 올린다.
 # 앱은 DB의 버전이 이 값과 다르면 DB를 통째로 재생성한다.
-SCHEMA_VERSION = 4      # v4: 마스터 v3(3002종) 반영 → 신규 종 재고 재생성
+SCHEMA_VERSION = 5      # v5: dispatch_log 구조 검증 강화 + 옛 PK DB 강제 재생성
 
 
 def db_is_valid(conn):
-    """현재 DB가 최신 스키마(SCHEMA_VERSION, dispatch_log 존재)인지 확인."""
+    """현재 DB가 최신 스키마인지 확인.
+    테이블 존재 + user_version + dispatch_log의 컬럼/PK 구조까지 검증한다.
+    (옛 버전은 dispatch_log의 PK 구성이 달라 ON CONFLICT 쿼리가 깨졌음)"""
     try:
         tabs = {r[0] for r in conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         if not {"nursery", "stock", "dispatch_log"} <= tabs:
             return False
-        ver = conn.execute("PRAGMA user_version").fetchone()[0]
-        return ver == SCHEMA_VERSION
+        if conn.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
+            return False
+        # dispatch_log 구조: source 컬럼 + PK가 정확히 (plant_id, nursery_id, source)
+        dl = conn.execute("PRAGMA table_info(dispatch_log)").fetchall()
+        dl_cols = {r[1] for r in dl}
+        dl_pk   = {r[1] for r in dl if r[5]}     # r[5]=pk 순번(0이면 PK 아님)
+        if not {"plant_id", "nursery_id", "source", "cnt"} <= dl_cols:
+            return False
+        if dl_pk != {"plant_id", "nursery_id", "source"}:
+            return False
+        # stock 필수 컬럼
+        stk = {r[1] for r in conn.execute("PRAGMA table_info(stock)").fetchall()}
+        if not {"nursery_id", "plant_id", "qty"} <= stk:
+            return False
+        return True
     except Exception:
         return False
 
