@@ -643,11 +643,30 @@ def _fit_font(draw, text, max_w, start=46, floor=26):
         sz -= 2
     return find_font(floor)
 
-def share_card(img_bytes, pid, copy_text, score, greeting=None, plant_scale=100):
-    """공유 카드 PNG 생성 (셀카 | 식물 일러스트 좌우 배치).
-    greeting    : 상단 인사말(성별 맞춤). None이면 기본 '{USER_NAME} 님'.
-    plant_scale : 식물 일러스트 크기 비율(%). 100=기본. 식물은 오른쪽 제자리에
-                  세로 중앙 정렬로 커지거나 작아지며, 아래 문구 위치는 고정된다."""
+FACE_CANVAS_W, FACE_CANVAS_H, FACE_SELF = 790, 620, 340
+
+def _face_canvas(img_bytes):
+    """공유 카드의 이미지 영역(밝은 캔버스 + 셀카 좌측 고정)을 RGBA로 반환.
+    조작 화면(드래그·핀치)과 최종 카드가 '완전히 같은' 배경을 쓰도록 공용화한다."""
+    canvas = Image.new("RGBA", (FACE_CANVAS_W, FACE_CANVAS_H), (232, 245, 233, 255))
+    ph = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+    side = min(ph.size)
+    ph = ph.crop(((ph.width-side)//2, (ph.height-side)//2,
+                  (ph.width+side)//2, (ph.height+side)//2)).resize((FACE_SELF, FACE_SELF))
+    canvas.paste(ph, (15, (FACE_CANVAS_H - FACE_SELF) // 2))     # 좌측·세로중앙 고정
+    return canvas
+
+def face_stage_bg(img_bytes):
+    """드래그·핀치 조작 화면에 깔 배경(캔버스, 식물 제외) JPEG 바이트."""
+    buf = io.BytesIO()
+    _face_canvas(img_bytes).convert("RGB").save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+def share_card(img_bytes, pid, copy_text, score, greeting=None, pos=None):
+    """공유 카드 PNG 생성.
+    greeting : 상단 인사말(성별 맞춤). None이면 기본 '{USER_NAME} 님'.
+    pos=(x%, y%, 크기%) : 캔버스 위 식물의 중심 위치와 크기(캔버스 폭 대비 %).
+                          None이면 기본값(우측·중앙). 셀카는 항상 좌측 고정."""
     if greeting is None:
         greeting = f"{USER_NAME} 님"
     W, H = 840, 1030
@@ -656,21 +675,17 @@ def share_card(img_bytes, pid, copy_text, score, greeting=None, plant_scale=100)
     d.rectangle([0, 0, W, 110], fill=(46, 125, 50, 255))
     d.text((30, 30), "🌱 Flower Land (플라워랜드)", font=find_font(40), fill="white")
 
-    # ── 이미지 밴드(고정 높이): 셀카(좌) · 식물(우), 둘 다 세로 중앙 정렬 ──
-    y_top, BAND_H = 140, 600
-    cy = y_top + BAND_H // 2                      # 밴드 세로 중심
-    SELF_PS = 360
-    # 식물 크기: 슬라이더 비율 반영 + 밴드 밖으로 넘치지 않게 캡
-    plant_ps = int(520 * plant_scale / 100)
-    plant_ps = max(240, min(plant_ps, 640))
-    _pl = plant_image(pid, plant_ps, "blue" if pid == "P416" else None)
-    card.paste(_pl, (W - plant_ps - 15, cy - plant_ps // 2), _pl)   # 우측·세로중앙
-    ph = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-    side = min(ph.size)
-    ph = ph.crop(((ph.width-side)//2, (ph.height-side)//2,
-                  (ph.width+side)//2, (ph.height+side)//2)).resize((SELF_PS, SELF_PS))
-    card.paste(ph, (25, cy - SELF_PS // 2))                          # 좌측·세로중앙
-    ty = y_top + BAND_H + 30                       # 문구 위치는 식물 크기와 무관하게 고정
+    # ── 캔버스(셀카 좌측 고정) + 식물(자유 위치·크기) ──
+    canvas = _face_canvas(img_bytes)
+    x_pct, y_pct, scale_pct = pos if pos else (72, 50, 66)
+    pl_ps = max(120, int(FACE_CANVAS_W * scale_pct / 100))
+    pl = plant_image(pid, pl_ps, "blue" if pid == "P416" else None)
+    px = int(FACE_CANVAS_W * x_pct / 100 - pl_ps / 2)
+    py = int(FACE_CANVAS_H * y_pct / 100 - pl_ps / 2)
+    canvas.paste(pl, (px, py), pl)                 # paste는 음수/넘침 좌표 허용
+    PC_TOP = 130
+    card.paste(canvas, (25, PC_TOP), canvas)
+    ty = PC_TOP + FACE_CANVAS_H + 30               # 문구는 항상 캔버스 아래 고정
 
     f_mid = find_font(30)
     line1 = f"{greeting} & {PLANT_NAMES[pid]} :"
@@ -701,6 +716,101 @@ def composite_plant(bg_bytes, pid, x_pct, y_pct, scale_pct, label):
                         radius=10, fill=(255, 255, 255, 235))
     d.text((x+ps/2-tw/2, y+ps+14), label, font=f, fill=(30, 60, 30))
     return out
+
+def interactive_place(bg_bytes, pid, init_x, init_y, init_s, prefix, label, height=560):
+    """배경 위에서 식물을 드래그(이동)·핀치/휠(크기)로 조작하는 공용 컴포넌트.
+    prefix : 페이지별 쿼리파라미터 접두사(값 충돌 방지). label : 안내 문구.
+    반환   : '확정' 직후 (x%, y%, 크기%) 튜플, 그 외 None."""
+    bg_b64 = base64.b64encode(bg_bytes).decode()
+    ill = plant_illust(pid)
+    if ill:
+        _pi = _white_to_transparent(ill)
+        _buf = io.BytesIO(); _pi.save(_buf, "PNG")
+        plant_b64 = base64.b64encode(_buf.getvalue()).decode()
+    else:
+        _pl = draw_plant(400, "blue" if pid == "P416" else None)
+        _buf = io.BytesIO(); _pl.save(_buf, "PNG")
+        plant_b64 = base64.b64encode(_buf.getvalue()).decode()
+    kx, ky, ks = f"{prefix}x", f"{prefix}y", f"{prefix}sc"
+    components.html(f"""
+    <div id="stage" style="position:relative; width:100%; max-width:620px;
+         margin:0 auto; touch-action:none; user-select:none; border-radius:12px;
+         overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.15);">
+      <img id="bg" src="data:image/jpeg;base64,{bg_b64}"
+           style="width:100%; display:block; pointer-events:none;">
+      <img id="plant" src="data:image/png;base64,{plant_b64}"
+           style="position:absolute; left:{init_x}%; top:{init_y}%; width:{init_s}%;
+                  transform:translate(-50%,-50%); cursor:grab;
+                  filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));">
+      <div style="position:absolute; left:8px; bottom:8px; background:rgba(46,125,50,.85);
+           color:#fff; font-size:12px; padding:3px 9px; border-radius:8px;">{label}</div>
+    </div>
+    <div style="text-align:center; margin-top:10px;">
+      <button id="confirm" style="background:#2e7d32; color:#fff; border:none;
+         font-size:16px; font-weight:700; padding:11px 28px; border-radius:10px;
+         cursor:pointer;">✅ 이 위치·크기로 확정</button>
+      <span id="pos" style="margin-left:10px; color:#666; font-size:13px;"></span>
+    </div>
+    <script>
+    (function(){{
+      const stage=document.getElementById('stage');
+      const plant=document.getElementById('plant');
+      let px={init_x}, py={init_y}, scale={init_s};
+      function apply(){{
+        plant.style.left=px+'%'; plant.style.top=py+'%'; plant.style.width=scale+'%';
+        document.getElementById('pos').textContent =
+          '좌우 '+Math.round(px)+'% · 상하 '+Math.round(py)+'% · 크기 '+Math.round(scale)+'%';
+      }}
+      function rect(){{ return stage.getBoundingClientRect(); }}
+      let dragging=false, ox=0, oy=0;
+      function startDrag(cx,cy){{ dragging=true; plant.style.cursor='grabbing';
+        const r=rect(); ox=cx-r.left-(px/100*r.width); oy=cy-r.top-(py/100*r.height); }}
+      function moveDrag(cx,cy){{ if(!dragging)return; const r=rect();
+        px=Math.min(98,Math.max(2,((cx-r.left-ox)/r.width)*100));
+        py=Math.min(98,Math.max(2,((cy-r.top-oy)/r.height)*100)); apply(); }}
+      function endDrag(){{ dragging=false; plant.style.cursor='grab'; }}
+      plant.addEventListener('mousedown',e=>{{startDrag(e.clientX,e.clientY);e.preventDefault();}});
+      window.addEventListener('mousemove',e=>moveDrag(e.clientX,e.clientY));
+      window.addEventListener('mouseup',endDrag);
+      stage.addEventListener('wheel',e=>{{ scale=Math.min(95,Math.max(12,
+        scale - Math.sign(e.deltaY)*3)); apply(); e.preventDefault(); }},{{passive:false}});
+      let pinchStart=0, scaleStart={init_s};
+      function dist(t){{ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+        return Math.hypot(dx,dy); }}
+      stage.addEventListener('touchstart',e=>{{
+        if(e.touches.length===1){{ startDrag(e.touches[0].clientX,e.touches[0].clientY); }}
+        else if(e.touches.length===2){{ dragging=false; pinchStart=dist(e.touches);
+          scaleStart=scale; }}
+        e.preventDefault();
+      }},{{passive:false}});
+      stage.addEventListener('touchmove',e=>{{
+        if(e.touches.length===1){{ moveDrag(e.touches[0].clientX,e.touches[0].clientY); }}
+        else if(e.touches.length===2 && pinchStart>0){{
+          scale=Math.min(95,Math.max(12, scaleStart*(dist(e.touches)/pinchStart))); apply(); }}
+        e.preventDefault();
+      }},{{passive:false}});
+      stage.addEventListener('touchend',e=>{{ if(e.touches.length===0){{endDrag();pinchStart=0;}} }});
+      document.getElementById('confirm').addEventListener('click',function(){{
+        const p = window.parent;
+        const url = new URL(p.location.href);
+        url.searchParams.set('{kx}', Math.round(px));
+        url.searchParams.set('{ky}', Math.round(py));
+        url.searchParams.set('{ks}', Math.round(scale));
+        p.location.href = url.toString();
+      }});
+      apply();
+    }})();
+    </script>
+    """, height=height)
+    qp = st.query_params
+    if kx in qp and ky in qp and ks in qp:
+        try:
+            out = (int(qp[kx]), int(qp[ky]), int(qp[ks]))
+        except ValueError:
+            out = None
+        st.query_params.clear()
+        return out
+    return None
 
 # ── 라우팅 ───────────────────────────────────────────────────────────────────
 ss = st.session_state
@@ -954,14 +1064,19 @@ elif page == "face":
         st.markdown("<div class='step'>3단계: 유형 카드 공유 & 매칭 농원</div>",
                     unsafe_allow_html=True)
 
-        # ── 식물 크기 조절 (카드 속 식물 일러스트 크기) ──
-        plant_scale = st.slider("🌿 식물 크기 조절", 60, 130,
-                                ss.get("face_plant_scale", 100), 5,
-                                help="카드 속 식물 일러스트를 키우거나 줄입니다.")
-        ss.face_plant_scale = plant_scale
+        # ── 식물 위치·크기 조정 (드래그로 이동 · 핀치/휠로 크기) ──
+        st.caption("👆 식물을 끌어서 옮기고, 두 손가락(또는 마우스 휠)으로 크기를 조절한 뒤 "
+                   "‘이 위치·크기로 확정’을 누르세요.")
+        fx = ss.get("f_x", 72); fy = ss.get("f_y", 50); fs = ss.get("f_s", 66)
+        stage_bg = face_stage_bg(ss.face_img)      # 셀카 좌측 고정 캔버스
+        fres = interactive_place(stage_bg, pid, fx, fy, fs, "f",
+                                 f"{PLANT_NAMES[pid]} — 끌어서 이동 · 두 손가락/휠로 크기")
+        if fres:
+            ss.f_x, ss.f_y, ss.f_s = fres; st.rerun()
 
-        card = share_card(ss.face_img, pid, copy, score,
-                          greeting=greeting, plant_scale=plant_scale)
+        # 조정된 위치·크기(없으면 기본값)로 카드 생성
+        pos = (ss.get("f_x", 72), ss.get("f_y", 50), ss.get("f_s", 66))
+        card = share_card(ss.face_img, pid, copy, score, greeting=greeting, pos=pos)
         st.image(card, use_container_width=True) # ◀ 결과 카드 화면 폭에 꽉 차게 확대
         buf = io.BytesIO(); card.convert("RGB").save(buf, "PNG")
         st.download_button("📤 결과 공유하기 (카드 PNG 저장)", buf.getvalue(),
@@ -971,7 +1086,8 @@ elif page == "face":
         b = best_nursery(pid, "fun01")
         if b: best_card(b, pid)
         if st.button("처음부터 다시", use_container_width=True):
-            ss.pop("face_plant_scale", None)     # 크기 초기화
+            for _k in ("f_x", "f_y", "f_s"):
+                ss.pop(_k, None)                 # 위치·크기 초기화
             ss.face_step = 1; st.rerun()
 
 # ══════════════ 공간 플랜테리어 (4단계) ══════════════
