@@ -195,6 +195,10 @@ with st.sidebar:
                 with st.spinner("Gemini 호출 중..."):
                     r = gm.ask_json(api_key, '{"ok": true} 를 그대로 반환하시오.')
                 st.success(f"연결 정상 ✓ (응답: {r})")
+                # 연결이 정상이면 이전 실패로 꺼둔 식물검색 AI를 다시 켠다
+                st.session_state.plant_ai_off = False
+                for _k in ("plant_ai_notified", "plant_ai_cache", "plant_ai_err"):
+                    st.session_state.pop(_k, None)
             except Exception as e:
                 st.error(f"연결 실패: {type(e).__name__}\n\n{str(e)[:300]}")
                 st.caption("키는 aistudio.google.com 발급분(AIza로 시작)이어야 하며, "
@@ -772,10 +776,17 @@ ss.setdefault("face_step", 1); ss.setdefault("space_step", 1)
 def go(p): ss.page = p; st.rerun()
 
 def show_plant_intro(name, registered):
-    """API(제미나이)로 식물 유형·특징·관리법 소개. 키 없으면 DB 기본정보 폴백."""
-    tag = "🤖 Gemini" if gemini_on() else "기본 정보"
-    if gemini_on():
-        with st.spinner(f"'{name}' 식물 정보를 AI로 분석 중..."):
+    """식물 소개. Gemini 키가 있고 정상이면 AI 분석, 실패하거나 키가 없으면
+    plants_master.csv(단지 카탈로그) 정보로 폴백한다.
+    · 같은 이름은 세션 캐시로 재호출하지 않음(반복 실패/지연 방지)
+    · 한 번 실패하면 이후 검색은 AI를 생략하고 조용히 카탈로그로 표시."""
+    ai_available = gemini_on() and not ss.get("plant_ai_off")
+    info = None
+    if ai_available:
+        cache = ss.setdefault("plant_ai_cache", {})
+        if name in cache:
+            info = cache[name]                          # 이미 조회한 이름 → 재호출 안 함
+        else:
             names = "、".join(PLANT_NAMES.values())
             prompt = (
                 f"너는 원예 전문가다. 식물 '{name}'을 소개한다.\n"
@@ -786,44 +797,57 @@ def show_plant_intro(name, registered):
                 f"'similar'는 반드시 이 목록에서만: {names}\n"
                 f"'{name}'이 식물이 아니면 exists=false.")
             try:
-                info = gm.ask_json(api_key, prompt)
+                with st.spinner(f"'{name}' 식물 정보를 AI로 분석 중..."):
+                    info = gm.ask_json(api_key, prompt)
             except Exception as e:
-                st.error(f"AI 조회 실패: {type(e).__name__} — 기본 정보로 대체")
                 info = None
+                ss.plant_ai_off = True                  # 이후 검색은 AI 생략(스팸 방지)
+                ss.plant_ai_err = type(e).__name__
+            cache[name] = info                          # None도 캐시 → 같은 이름 재시도 방지
         if info and info.get("exists"):
             ss.last_similar = info.get("similar", [])
             st.markdown(
                 f"<div class='result'><b style='font-size:19px'>{name}</b> "
                 f"<span style='color:#888'>{info.get('sci','')}</span> "
-                f"<span class='chip'>{tag}</span><br>"
+                f"<span class='chip'>🤖 Gemini</span><br>"
                 f"<b>유형</b>: {info.get('type','-')} · <b>난이도</b>: {info.get('level','-')}<br>"
                 f"{info.get('summary','')}<br>"
                 f"☀️ {info.get('light','-')} &nbsp; 💧 {info.get('water','-')}</div>",
                 unsafe_allow_html=True)
             return
-    # ── 폴백: DB 마스터의 기본 정보 (plant 테이블 있으면 사용) ──
+
+    # AI가 꺼졌다면(실패 이력) 세션당 1번만 안내
+    if ss.get("plant_ai_off") and not ss.get("plant_ai_notified"):
+        st.caption(f"ℹ️ AI 상세 분석을 불러오지 못해 단지 카탈로그 정보로 표시합니다. "
+                   f"(원인: {ss.get('plant_ai_err','오류')} · 사이드바에서 Gemini 키/모델 확인)")
+        ss.plant_ai_notified = True
+
+    # ── 폴백: 마스터 카탈로그(plants_master.csv) 기반 실제 식물 정보 ──
     if name in NAME_TO_PID:
-        try:
-            pid = NAME_TO_PID[name]
+        pid = NAME_TO_PID[name]
+        en, sci, cat = PLANT_EN.get(pid, ""), PLANT_SCI.get(pid, ""), PLANT_CAT.get(pid, "")
+        desc = PLANT_DESC.get(pid, "")
+        care = ""
+        try:  # care 컬럼이 있는 DB면 덤으로 표시(없어도 무방)
             row = conn.execute("SELECT care_level, light_need, water_cycle "
                                "FROM plant WHERE id=?", (pid,)).fetchone()
+            if row:
+                care = f"<br>난이도 {row[0]} · ☀️ {row[1]} · 💧 {row[2]}일 주기"
         except Exception:
-            row = None
-        if row:
-            st.markdown(
-                f"<div class='result'><b style='font-size:19px'>{name}</b> "
-                f"<span class='chip'>{tag}</span><br>"
-                f"난이도 {row[0]} · ☀️ {row[1]} · 💧 {row[2]}일 주기</div>",
-                unsafe_allow_html=True)
-            return
+            pass
         st.markdown(
             f"<div class='result'><b style='font-size:19px'>{name}</b> "
-            f"<span class='chip'>단지 취급 품종</span><br>"
-            "이 품종은 단지에서 취급 중입니다. 아래에서 취급 농원을 확인하세요.</div>",
+            + (f"<span style='color:#888'>{sci}</span> " if sci else "")
+            + f"<span class='chip'>단지 카탈로그</span><br>"
+            + (f"<b>영문명</b>: {en}<br>" if en else "")
+            + (f"<b>분류</b>: {cat}<br>" if cat else "")
+            + (f"{desc}<br>" if desc else "")
+            + "불로화훼단지에서 취급 중인 품종입니다. 아래에서 취급 농원·재고를 확인하세요."
+            + care + "</div>",
             unsafe_allow_html=True)
         return
-    st.info(f"'{name}'의 상세 정보가 준비되지 않았습니다. "
-            "(사이드바에서 Gemini 키를 연결하면 AI 소개가 표시됩니다)")
+    st.info(f"'{name}'은(는) 단지 카탈로그(1,001종)에 없는 품종입니다. "
+            "사이드바에서 Gemini 키를 연결하면 AI 소개를 볼 수 있습니다.")
 
 def show_stock_nurseries(pid, compact=False):
     """DB에서 해당 품종 취급 농원·재고 표시 + 트래픽 분배 추천 회원사."""
