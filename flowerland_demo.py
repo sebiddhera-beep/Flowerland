@@ -64,7 +64,7 @@ st.markdown(f"""
                animation:fl-rotate 0.9s linear infinite; }}
 .fl-spin-txt {{ margin-top:14px; color:{GREEN}; font-weight:700; font-size:15px; }}
 @keyframes fl-rotate {{ to {{ transform:rotate(360deg); }} }}
-.block-container {{ max-width: {PC_MAX_WIDTH}; margin: 0 auto; padding-top: 1.0rem; }}
+.block-container {{ max-width: {PC_MAX_WIDTH}; margin: 0 auto; padding-top: 2.4rem; }}
 h1,h2,h3 {{ color:{GREEN}; }}
 .step {{ color:{GREEN}; font-weight:800; font-size:15px; letter-spacing:.3px; }}
 .big  {{ font-size:24px; font-weight:800; line-height:1.35; }}
@@ -1041,15 +1041,58 @@ def show_stock_nurseries(pid, compact=False):
         if b:
             st.markdown("#### ⭐ 오늘의 추천 회원사 (트래픽 분배)")
             best_card(b, pid)
+NOTICES = [
+    ("🎉", "봄맞이 분갈이 이벤트 — 이번 주말 현장 무료 분갈이"),
+    ("📅", "예약 확정 — 3/16(토) 14:00 대형 몬스테라 상담"),
+    ("🌸", "신규 입고 — 올리브나무·아레카야자 대형목"),
+]
+WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
+def season_weather(month):
+    """계절별 간이 날씨 + 식물 관리 팁(데모용). 실제 날씨 API 연동 가능."""
+    if month in (12, 1, 2):
+        return "❄️ 5°C 건조", "겨울엔 물주기 절반 · 창가 냉해 주의"
+    if month in (3, 4, 5):
+        return "🌤️ 18°C 온화", "봄 분갈이 적기 · 새순 성장기"
+    if month in (6, 7, 8):
+        return "☀️ 29°C 습함", "통풍·과습 주의 · 직사광 차광"
+    return "🍂 15°C 선선", "물주기 줄이고 실내로 이동 준비"
+
 def header():
-    c1, c2 = st.columns([3, 1])
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)  # 로고 상단 여백
+    c1, c2 = st.columns([3, 2])
     if asset("FL_Land.png"):
-        c1.image(asset("FL_Land.png"), width=260)
+        c1.image(asset("FL_Land.png"), width=230)
     else:
         c1.markdown("### 🌱 Flower Land <span style='font-size:13px;color:#777'>(플라워랜드)</span>",
                     unsafe_allow_html=True)
-    c2.markdown(f"<div style='text-align:right;padding-top:14px'>{USER_NAME}님 🌿</div>",
-                unsafe_allow_html=True)
+    with c2:
+        # 🔔 알림 벨 (신규 소식·예약 알림)
+        with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=True):
+            st.markdown("**📣 새 소식 · 예약 알림**")
+            for ico, txt in NOTICES:
+                st.markdown(f"{ico} {txt}")
+        # 📅 오늘 날짜 · 날씨 · 관리 팁
+        now = datetime.now()
+        wx, tip = season_weather(now.month)
+        st.markdown(
+            f"<div style='text-align:right;font-size:11px;line-height:1.4;color:#666'>"
+            f"<b>{now.month}/{now.day}({WEEKDAYS[now.weekday()]})</b> {wx}<br>"
+            f"🌿 {tip}</div>", unsafe_allow_html=True)
+
+def home_button(page):
+    """홈 버튼: FL_Land.png 로고(클릭 시 홈)+'홈' 글자. 로고 파일 없으면 텍스트 버튼."""
+    logo = asset("FL_Land.png")
+    if not logo:
+        if st.button("🏠 홈", key=f"home_{page}"):
+            go("home")
+        return
+    c1, c2, _ = st.columns([2, 1, 6])
+    with c1:
+        clicked = clickable_image(logo, f"homebtn_{page}", "150/56", fit="contain")
+    c2.markdown("<div style='padding-top:9px;font-weight:800;color:#2E7D32;"
+                "font-size:15px'>홈</div>", unsafe_allow_html=True)
+    if clicked:
+        go("home")
 
 page = ss.page
 
@@ -1133,7 +1176,7 @@ if page == "home":
 # ══════════════ 식물 상세 (TOP5 등에서 진입) ══════════════
 elif page == "plant":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     pid = ss.get("plant_pid")
     if not pid or pid not in PLANT_NAMES:
         st.warning("식물 정보를 찾을 수 없습니다.")
@@ -1164,16 +1207,13 @@ elif page == "face":
     header()
     step = ss.face_step
     if step == 1:
-        hc1, hc2 = st.columns([1, 3])
-        with hc1:
-            if st.button("← 홈으로", key=f"home_{page}", use_container_width=True): go("home")
-        with hc2:
-            st.markdown(
-                "<div class='step' style='padding-top:8px'>"
-                "1단계 : 분석할 셀카를 찍어주세요</div>",
-                unsafe_allow_html=True)
+        home_button(page)
+        st.markdown(
+            "<div class='step' style='padding-top:4px'>"
+            "1단계 : 분석할 셀카를 찍어주세요</div>",
+            unsafe_allow_html=True)
     else:
-        if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+        home_button(page)
 
     if step == 1:
         ss.mbti = st.selectbox("MBTI (선택)", ["선택 안 함"] + [
@@ -1216,9 +1256,9 @@ elif page == "face":
 # ══════════════ 공간 플랜테리어 (4단계) ══════════════
 elif page == "space":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     step = ss.space_step
-    st.progress(step / 4, text=f"{step}단계 / 4단계")
+    st.progress(step / 3, text=f"{step}단계 / 3단계")
 
     if step == 1:
         st.markdown("<div class='step'>1단계: 공간 사진 등록</div>", unsafe_allow_html=True)
@@ -1251,12 +1291,11 @@ elif page == "space":
                 ss.sp_ai = None; ss.sp_ai_h = h
         ai = ss.get("sp_ai") if ss.get("sp_ai_h") == h else None
 
-        st.markdown("<div class='step'>2단계: 공간 정밀 분석"
+        st.markdown("<div class='step'>2단계: 정밀 분석 & 가상 배치"
                     + (" · 🤖 Gemini" if ai else " · 목업") + "</div>",
                     unsafe_allow_html=True)
         st.markdown(f"<div class='big'>AI가 당신의 {ss.room}을 분석했습니다!</div>",
                     unsafe_allow_html=True)
-        st.image(ss.sp_img, use_container_width=True)
         icons = ["☀️", "🌱", "❄️", "📐"] if outdoor else ["🪟", "💡", "🎨", "📏"]
         if ai and ai.get("cards"):
             cards = [(icons[i % 4], c.get("title", ""),
@@ -1294,36 +1333,25 @@ elif page == "space":
                     f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
         st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
 
-        # ── 추천 식물 5종: 탭해서 배치할 식물 선택(선택 시 색이 진해짐) ──
+        # ── 추천 식물 5종 준비 + 배치할 식물 확정 ──
         ss.sp_recs = recs
-        st.markdown("#### 🌿 추천 식물 5종 · 배치할 식물을 탭하세요")
-        plant_picker(recs, "pick2")
-        if st.button("다음 →", type="primary", use_container_width=True):
-            ss.space_step = 3; st.rerun()
+        if ss.get("sp_pid") not in recs:
+            ss.sp_pid = recs[0]
+        pid = ss.sp_pid
 
-    elif step == 3:
-        recs = ss.get("sp_recs") or [ss.sp_pid]
-        st.markdown("<div class='step'>3단계: 가상 플랜테리어 체험</div>", unsafe_allow_html=True)
-        # 수동 배치를 기본값으로, AI 합성은 두 번째 (요청 4)
+        # ── 가상 배치 (기존 3단계를 여기로 병합) ──
+        st.markdown("##### 🪴 가상 배치 체험")
         mode = st.radio("합성 방식", ["🎚️ 수동 배치", "🤖 AI 실사 합성 (Gemini)"],
-                        horizontal=True, index=0)
+                        horizontal=True, index=0)   # 수동 배치가 기본
         if mode.startswith("🎚️"):
-            pid = ss.sp_pid
             st.caption("✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 "
                        "(PC는 드래그 이동, 휠로 크기)")
-            place_stage(pid, key="st3")     # 확정 버튼 없이 실시간 배치 (요청 6)
-            st.markdown("##### 🌿 다른 식물 배치해보기 · 탭하면 사진에 올라옵니다 (요청 5)")
-            plant_picker(recs, "pick3")
-            _pot = ["토분", "플라스틱(화이트)", "야외용(다크)"]
-            ss.pot_style = st.selectbox("🏺 화분 스타일", _pot,
-                                        index=_pot.index(ss.get("pot_style", "토분")),
-                                        help="일러스트가 도형인 식물의 화분 색에 반영됩니다.")
+            place_stage(pid, key="st2")             # 확정 버튼 없이 실시간 배치
         else:
-            pid = ss.sp_pid
             if not gemini_on():
                 st.warning("사이드바에 Gemini API 키를 입력하면 실사 합성이 가능합니다.")
             else:
-                cache_key = (img_hash(ss.sp_img), pid)
+                cache_key = (h, pid)
                 if ss.get("comp_key") != cache_key:
                     try:
                         with st.spinner(f"🤖 Gemini가 {PLANT_NAMES[pid]}을(를) "
@@ -1339,19 +1367,25 @@ elif page == "space":
                              caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Gemini)")
                     if st.button("🔄 다시 합성하기", use_container_width=True):
                         ss.comp_key = None; st.rerun()
-        b1, b2 = st.columns(2)
-        b1.button("🔄 처음 식물 다시 고르기", use_container_width=True,
-                  on_click=lambda: ss.update(space_step=2))
-        b2.button("🛒 장바구니 담기", use_container_width=True)
+
+        # ── 추천 식물 5종: 사진 아래에서 탭하면 사진에 올라옵니다 ──
+        st.markdown("#### 🌿 추천 식물 5종 · 탭하면 사진에 올라옵니다")
+        plant_picker(recs, "pick2")
+        if mode.startswith("🎚️"):
+            _pot = ["토분", "플라스틱(화이트)", "야외용(다크)"]
+            ss.pot_style = st.selectbox("🏺 화분 스타일", _pot,
+                                        index=_pot.index(ss.get("pot_style", "토분")),
+                                        help="일러스트가 도형인 식물의 화분 색에 반영됩니다.")
+        st.button("🛒 장바구니 담기", use_container_width=True)
         if st.button("다음 →", type="primary", use_container_width=True):
-            ss.space_step = 4; st.rerun()
+            ss.space_step = 3; st.rerun()
 
     else:
         pid = ss.sp_pid
         recs = ss.get("sp_recs") or [pid]
         h = img_hash(ss.sp_img)
         match = ss.get("sp_match", 95 + h % 5)
-        st.markdown("<div class='step'>4단계: 나의 최적 식물 & 농원</div>",
+        st.markdown("<div class='step'>3단계: 나의 최적 식물 & 농원</div>",
                     unsafe_allow_html=True)
         st.markdown(f"<div class='big'>{USER_NAME}님! 이 식물이 당신의 {ss.room}과 "
                     f"{match}% 어울립니다!</div>", unsafe_allow_html=True)
@@ -1376,7 +1410,7 @@ elif page == "space":
 # ══════════════ 식물 검색 (취급 회원사 찾기) ══════════════
 elif page == "search":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🔎 식물 검색")
     st.caption("① AI가 식물 유형·특징을 소개하고 ② DB에서 취급 농원(재고)을 안내합니다.")
     q = st.text_input("식물 이름", value=ss.get("search_q", ""),
@@ -1396,14 +1430,14 @@ elif page == "search":
         else:
             disp_name = term
 
-        # ── ① API(제미나이): 식물 유형·소개 ──────────────────────
-        st.markdown("### 🌿 식물 소개")
-        show_plant_intro(disp_name, registered=bool(pid))
-
-        # ── DB 카탈로그 이미지 (핀치/휠로 크기 조절 · 끌어서 이동) ──
+        # ── 품종을 고르면 바로 카탈로그 이미지 표시 (핀치/휠로 크기 조절) ──
         if pid:
             st.markdown("### 🖼️ 카탈로그 이미지")
             pinch_image(pid)
+
+        # ── ① API(제미나이): 식물 유형·소개 ──────────────────────
+        st.markdown("### 🌿 식물 소개")
+        show_plant_intro(disp_name, registered=bool(pid))
 
         # ── ② DB: 취급 농원·재고 ────────────────────────────────
         st.markdown("### 🏪 어느 농원에 있나요")
@@ -1424,7 +1458,7 @@ elif page == "search":
 # ══════════════ 회원사 관리자 모드 ══════════════
 elif page == "admin":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🔑 회원사 관리자 모드")
 
     # ── 로그인 상태 관리 ──
@@ -1594,7 +1628,7 @@ elif page == "admin":
 # ══════════════ 건강 진단 ══════════════
 elif page == "diag":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🔍 식물 건강 진단")
     t1, t2 = st.tabs(["📷 카메라로 촬영", "📁 파일 업로드"])
     with t1:
@@ -1640,7 +1674,7 @@ elif page == "diag":
 # ══════════════ 농원 지도 ══════════════
 elif page == "map":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🗺️ 농원 지도 (불로화훼단지)")
     rows = conn.execute("SELECT id, name FROM nursery").fetchall()
     rng = np.random.RandomState(7)
@@ -1654,7 +1688,7 @@ elif page == "map":
 # ══════════════ 분갈이 특화 ══════════════
 elif page == "repot":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 🪴 분갈이·화분 특화 농원")
     for nid, name in conn.execute(
             "SELECT id, name FROM nursery ORDER BY RANDOM() LIMIT 6").fetchall():
@@ -1665,7 +1699,7 @@ elif page == "repot":
 # ══════════════ 내 식물 관리 (물·영양) ══════════════
 elif page == "care":
     header()
-    if st.button("← 홈으로", key=f"home_{page}", use_container_width=False): go("home")
+    home_button(page)
     st.markdown("## 💧 내 식물 관리")
     st.caption("우리 집 식물의 물 주기·영양제 일정을 관리하세요.")
 
