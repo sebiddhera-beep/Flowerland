@@ -404,19 +404,20 @@ def _b64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-def clickable_image(path, key, aspect="351/416", fit="100% 100%"):
+def clickable_image(path, key, aspect="351/416", fit="100% 100%", frame=True):
     """이미지 전체가 버튼으로 동작. 클릭하면 True 반환 (세션 유지됨).
-    fit="contain"이면 종횡비를 유지한 채 카드 안에 맞춤 (TOP5 일러스트용)."""
+    fit="contain"이면 종횡비를 유지한 채 카드 안에 맞춤 (TOP5 일러스트용).
+    frame=False면 테두리·배경 없이 이미지만 (로고 등 여백 제거용)."""
+    box = ("border-radius: 16px; border: 1px solid #e3e3e3;" if frame
+           else "border: none; background-color: transparent;")
+    hov = ("border-color: {g}; box-shadow: 0 3px 12px rgba(46,125,50,.30); "
+           "transform: translateY(-1px);".format(g=GREEN) if frame else "opacity: .82;")
     st.markdown(f"""<style>
     .st-key-{key} button {{
         background: url("data:image/png;base64,{_b64(path)}") center / {fit} no-repeat;
-        width: 100%; aspect-ratio: {aspect}; height: auto;
-        border-radius: 16px; border: 1px solid #e3e3e3;
+        width: 100%; aspect-ratio: {aspect}; height: auto; {box}
     }}
-    .st-key-{key} button:hover {{
-        border-color: {GREEN}; box-shadow: 0 3px 12px rgba(46,125,50,.30);
-        transform: translateY(-1px); transition: all .15s;
-    }}
+    .st-key-{key} button:hover {{ {hov} transition: all .15s; }}
     .st-key-{key} button p, .st-key-{key} button div {{ color: transparent !important; }}
     </style>""", unsafe_allow_html=True)
     return st.button("\u200b", key=key, use_container_width=True)
@@ -1048,20 +1049,21 @@ NOTICES = [
 ]
 
 def header():
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)  # 로고 상단 여백
-    c1, c2 = st.columns([3, 2])
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)  # 로고 상단 여백
+    c1, c2 = st.columns([3, 1])
     logo = asset("FL_Land.png")
     with c1:
-        # FL_Land.png 로고 자체가 홈 버튼 (탭하면 홈으로) — 화면당 로고 1개
+        # FL_Land.png 로고 자체가 홈 버튼 (탭하면 홈으로) — 테두리·여백 없이 로고만
         if logo:
-            if clickable_image(logo, f"logohome_{page}", "230/84", fit="contain"):
+            if clickable_image(logo, f"logohome_{page}", "300/96",
+                               fit="contain", frame=False):
                 go("home")
         else:
             if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
                 go("home")
     with c2:
         # 🔔 알림 벨 (신규 소식·예약 알림)
-        with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=True):
+        with st.popover("🔔", use_container_width=True):
             st.markdown("**📣 새 소식 · 예약 알림**")
             for ico, txt in NOTICES:
                 st.markdown(f"{ico} {txt}")
@@ -1388,38 +1390,43 @@ elif page == "search":
     home_button(page)
     st.markdown("## 🔎 식물 검색")
     st.caption("① AI가 식물 유형·특징을 소개하고 ② DB에서 취급 농원(재고)을 안내합니다.")
-    q = st.text_input("식물 이름", value=ss.get("search_q", ""),
-                      placeholder="예: 몬스테라, 수국, 필로덴드론 버킨")
 
-    if q.strip():
-        term = q.strip()
-        hits = [(pid, nm) for pid, nm in PLANT_NAMES.items() if term in nm]
+    # 홈에서 넘어온 검색어를 아래 입력창(세션)에 반영
+    if ss.get("search_q") and ss.get("_last_sq") != ss.get("search_q"):
+        ss._last_sq = ss.search_q
+        ss.search_box = ss.search_q
+    ss.setdefault("search_box", "")
+    term = ss.search_box.strip()
 
+    pid = None
+    disp_name = term
+    hit_pids = []
+    if term:
+        hits = [(p, nm) for p, nm in PLANT_NAMES.items() if term in nm]
         hit_pids = [h[0] for h in hits]
         # 새 검색어면 품종 선택 초기화(옵션 불일치 방지)
         if ss.get("search_term_seen") != term:
             ss.search_term_seen = term
             ss.pop("variety_pick", None)
-
-        pid = None
-        disp_name = term
         if hit_pids:
-            # 이미지를 이름(품종 선택) 위에 먼저 그리기 위해 현재 품종을 미리 결정
             cur = ss.get("variety_pick")
             pid = cur if cur in hit_pids else hit_pids[0]
             disp_name = PLANT_NAMES[pid]
-
-            # ── 카탈로그 이미지: 식물 검색 아래 · 식물 이름 위 (핀치로 크기 조절) ──
+            # ── 카탈로그 이미지: 식물 검색 아래 · 식물 이름 위 ──
             st.markdown("### 🖼️ 카탈로그 이미지")
             pinch_image(pid)
-
-            # ── 품종(식물 이름) 선택 ──
+            # ── 품종 선택 ──
             if len(hit_pids) > 1:
                 pid = st.radio("품종 선택", hit_pids,
                                format_func=lambda p: PLANT_NAMES[p],
                                horizontal=True, key="variety_pick")
                 disp_name = PLANT_NAMES[pid]
 
+    # ── 식물 이름 (검색 입력) — 카탈로그 이미지 아래 ──
+    st.text_input("식물 이름", key="search_box",
+                  placeholder="예: 몬스테라, 수국, 필로덴드론 버킨")
+
+    if term:
         # ── ① API(제미나이): 식물 유형·소개 ──────────────────────
         st.markdown("### 🌿 식물 소개")
         show_plant_intro(disp_name, registered=bool(pid))
