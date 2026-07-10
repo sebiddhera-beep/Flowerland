@@ -97,14 +97,12 @@ h1,h2,h3 {{ color:{GREEN}; }}
            padding:8px 12px; margin-top:6px; font-size:14px; }}
 .stampbn {{ background:#e9f6e9; border-radius:12px; padding:10px 14px; font-weight:700; }}
 
-/* ── 헤더 알림 버튼: 오른쪽 정렬 컴팩트 알약 (빈 흰 박스처럼 커지지 않게) ── */
-[data-testid="stPopover"] {{ display:flex; justify-content:flex-end; }}
+/* ── 헤더 알림 버튼: 컬럼을 채우는 흰색 둥근 박스 (스크린샷과 동일) ── */
 [data-testid="stPopover"] button {{
     background:#ffffff !important; border:1px solid #e3e3e3 !important;
-    border-radius:14px !important; padding:.55rem 1.1rem !important;
-    min-height:0 !important; width:auto !important; white-space:nowrap !important;
+    border-radius:16px !important; min-height:60px !important;
     font-weight:700 !important; color:#2E5D32 !important;
-    box-shadow:0 1px 3px rgba(0,0,0,.05) !important;
+    box-shadow:0 1px 3px rgba(0,0,0,.04) !important;
 }}
 [data-testid="stPopover"] button:hover {{
     border-color:{GREEN} !important;
@@ -1270,8 +1268,8 @@ def header():
             if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
                 go("home")
     with c2:
-        # 🔔 알림 벨 — 오른쪽 정렬 컴팩트 알약 (use_container_width=False로 내용 폭)
-        with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=False):
+        # 🔔 알림 벨 — 컬럼을 채우는 넓은 흰 박스 (스크린샷과 동일)
+        with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=True):
             st.markdown("**📣 새 소식 · 예약 알림**")
             for ico, txt in NOTICES:
                 st.markdown(f"{ico} {txt}")
