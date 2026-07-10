@@ -1509,13 +1509,6 @@ elif page == "space":
             recs = (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
             ss.sp_match = 95 + h % 5
             ss.sp_reason = ""
-        # ── 분석 카드 4종을 한 줄로 압축 (요청: 한 줄로) ──
-        chips = " &nbsp;·&nbsp; ".join(
-            f"{e} <b>{t}</b> {s.split('<br>')[0]}" for (e, t, s) in cards)
-        st.markdown(f"<div class='acard' style='text-align:left; font-size:16px; "
-                    f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
-        st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
-
         # ── 추천 식물 5종 준비 + 배치할 식물 확정 ──
         ss.sp_recs = recs
         if ss.get("sp_pid") not in recs:
@@ -1550,6 +1543,13 @@ elif page == "space":
                              caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Gemini)")
                     if st.button("🔄 다시 합성하기", use_container_width=True):
                         ss.comp_key = None; st.rerun()
+
+        # ── 사진 아래: 분석 라인(창문방향…여백) + 종합 추천 지표 (첨부 이미지 순서) ──
+        chips = " &nbsp;·&nbsp; ".join(
+            f"{e} <b>{t}</b> {s.split('<br>')[0]}" for (e, t, s) in cards)
+        st.markdown(f"<div class='acard' style='text-align:left; font-size:16px; "
+                    f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
+        st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
 
         # ── 추천 식물 5종: 사진 아래에서 탭하면 사진에 올라옵니다 ──
         st.markdown("#### 🌿 추천 식물 5종 · 탭하면 사진에 올라옵니다")
