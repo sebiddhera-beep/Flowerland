@@ -1131,25 +1131,40 @@ def show_plant_intro(name, registered):
 
 def show_stock_nurseries(pid, compact=False):
     """DB에서 해당 품종 취급 농원·재고 표시 + 트래픽 분배 추천 회원사."""
-    rows = conn.execute("""
-        SELECT s.nursery_id, n.name, s.qty, s.updated_at
-        FROM stock s JOIN nursery n ON n.id = s.nursery_id
-        WHERE s.plant_id = ? AND s.qty > 0
-        ORDER BY s.qty DESC""", (pid,)).fetchall()
+    try:
+        rows = conn.execute("""
+            SELECT s.nursery_id, n.name, s.qty, s.updated_at,
+                   n.zone, COALESCE(n.address,''), COALESCE(n.phone,'')
+            FROM stock s JOIN nursery n ON n.id = s.nursery_id
+            WHERE s.plant_id = ? AND s.qty > 0
+            ORDER BY s.qty DESC""", (pid,)).fetchall()
+    except sqlite3.OperationalError:          # 구 DB: 주소·전화 컬럼 없음 → 추가 후 재시도
+        _ensure_admin_columns(conn)
+        rows = conn.execute("""
+            SELECT s.nursery_id, n.name, s.qty, s.updated_at,
+                   n.zone, COALESCE(n.address,''), COALESCE(n.phone,'')
+            FROM stock s JOIN nursery n ON n.id = s.nursery_id
+            WHERE s.plant_id = ? AND s.qty > 0
+            ORDER BY s.qty DESC""", (pid,)).fetchall()
     if not rows:
         st.error(f"현재 '{PLANT_NAMES.get(pid,'')}' 재고 보유 농원이 없습니다.")
+        st.caption("💡 관리자 모드에서 농원에 이 품종의 재고를 등록하면 여기에 표시됩니다.")
         return
     total = sum(r[2] for r in rows)
     st.markdown(f"<div class='nursery'>취급 농원 <b>{len(rows)}곳</b> · "
                 f"단지 총 재고 <b>{total}개</b></div>", unsafe_allow_html=True)
-    for nid, name, qty, upd in (rows if not compact else rows[:2]):
+    for nid, name, qty, upd, zone, addr, phone in (rows if not compact else rows[:2]):
         fresh = "🟢" if (upd and upd >= "2026") else "🟡"
-        kurl = kakao_map_url(name)
+        kurl = kakao_map_url(name, addr)
+        loc = addr or zone                    # 주소가 있으면 주소, 없으면 실제 구역
+        tel = (f"<a href='tel:{phone}' style='color:#e91e63; text-decoration:none; "
+               f"font-weight:700;'>📞 {phone}</a>" if phone else "")
         st.markdown(
-            f"<div class='nursery'>🏪 <b>{name}</b> ({nid}) · {zone_of(nid)}"
+            f"<div class='nursery'>🏪 <b>{name}</b> ({nid}) · {loc}"
             f"<br>재고 <b>{qty}개</b> {fresh} · "
             f"<a href='{kurl}' target='_blank' style='color:#1a73e8; "
-            f"text-decoration:none; font-weight:700;'>📍 지도</a> · 📞 전화</div>",
+            f"text-decoration:none; font-weight:700;'>📍 지도</a>"
+            + (f" · {tel}" if tel else "") + "</div>",
             unsafe_allow_html=True)
     if not compact:
         st.caption("🟢 재고 최근 갱신 · 🟡 갱신 필요(72h 기준)")
@@ -1806,6 +1821,63 @@ elif page == "admin":
                 conn.execute("DELETE FROM stock WHERE nursery_id=?", (enid,))
                 conn.execute("DELETE FROM nursery WHERE id=?", (enid,))
                 conn.commit(); st.warning(f"{enid} 삭제됨"); st.rerun()
+
+            # ── 이 농원에 재고(취급 식물) 바로 등록 → 검색과 즉시 매칭 ──
+            st.markdown("##### 🌿 이 농원의 취급 식물(재고) 등록")
+            st.caption("여기서 재고를 넣어야 식물 검색 결과에 이 농원이 표시됩니다.")
+            my_stock = conn.execute(
+                "SELECT plant_id, qty FROM stock WHERE nursery_id=? ORDER BY qty DESC",
+                (enid,)).fetchall()
+            if my_stock:
+                st.caption("현재 등록: " + " · ".join(
+                    f"{PLANT_NAMES.get(p, p)} {q}개" for p, q in my_stock[:8])
+                    + (" 외" if len(my_stock) > 8 else ""))
+            sc = st.columns([3, 1.4, 1.6, 1.6, 1.2])
+            sp_pid2 = sc[0].selectbox("품종", list(PLANT_NAMES.keys()),
+                                      format_func=lambda p: PLANT_NAMES[p],
+                                      key=f"mstk_p_{enid}")
+            sp_q = sc[1].number_input("재고", 0, 9999, 10, key=f"mstk_q_{enid}")
+            sp_min = sc[2].number_input("최저가", 0, 999999, 15000, step=1000,
+                                        key=f"mstk_min_{enid}")
+            sp_max = sc[3].number_input("최고가", 0, 999999, 45000, step=1000,
+                                        key=f"mstk_max_{enid}")
+            if sc[4].button("등록", key=f"mstk_add_{enid}", type="primary"):
+                conn.execute(
+                    "INSERT INTO stock(nursery_id,plant_id,qty,price_min,price_max,"
+                    "updated_at) VALUES(?,?,?,?,?,?) "
+                    "ON CONFLICT(nursery_id,plant_id) DO UPDATE SET qty=excluded.qty, "
+                    "price_min=excluded.price_min, price_max=excluded.price_max, "
+                    "updated_at=excluded.updated_at",
+                    (enid, sp_pid2, sp_q, sp_min, sp_max,
+                     datetime.now().strftime("%Y-%m")))
+                conn.commit()
+                st.toast(f"{PLANT_NAMES[sp_pid2]} {sp_q}개 등록"); st.rerun()
+
+        # ── 💾 현재 DB 백업(CSV) — 앱 재시작 시 데이터 소실 대비 ──
+        st.divider()
+        st.markdown("#### 💾 현재 농원·재고 백업")
+        st.caption("배포 환경은 앱 재시작 시 DB가 초기화될 수 있습니다. "
+                   "수정 후 이 백업 CSV를 내려받아 두면, 초기화돼도 그대로 다시 업로드해 복구할 수 있습니다.")
+        import io as _io2, csv as _csv2
+        _buf = _io2.StringIO()
+        _w = _csv2.writer(_buf)
+        _w.writerow(["농원ID", "농원명", "주소", "대표전화", "구역", "소개문구",
+                     "전문분야", "PIN", "취급식물명", "취급식물ID", "재고수량",
+                     "최저가", "최고가"])
+        _ensure_admin_columns(conn)
+        for r in conn.execute("""
+            SELECT n.id, n.name, COALESCE(n.address,''), COALESCE(n.phone,''), n.zone,
+                   COALESCE(n.tagline,''), COALESCE(n.specialty,''), COALESCE(n.pin,''),
+                   s.plant_id, s.qty, COALESCE(s.price_min,0), COALESCE(s.price_max,0)
+            FROM nursery n LEFT JOIN stock s ON s.nursery_id = n.id
+            ORDER BY n.id, s.qty DESC""").fetchall():
+            _w.writerow([r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7],
+                         PLANT_NAMES.get(r[8], "") if r[8] else "",
+                         r[8] or "", r[9] or "", r[10] or "", r[11] or ""])
+        st.download_button("⬇️ 현재 농원·재고 전체 CSV 내려받기",
+                           ("\ufeff" + _buf.getvalue()).encode("utf-8"),
+                           file_name=f"농원백업_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                           mime="text/csv", use_container_width=True)
 
         # ── 📁 농원·재고 CSV 일괄 업로드 ──
         st.divider()
