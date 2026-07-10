@@ -363,8 +363,20 @@ def import_nurseries_csv(file_bytes, replace=False):
     · replace=True면 기존 농원·재고·배정로그를 모두 지우고 새로 등록
     반환: {'nurseries': n, 'stocks': m, 'warnings': [...]}"""
     import io as _io, csv as _csv
-    text = file_bytes.decode("utf-8-sig", errors="replace")
-    reader = _csv.DictReader(_io.StringIO(text))
+    # 인코딩 자동 감지: 엑셀(UTF-8 BOM) / 한글 윈도우(CP949·EUC-KR) 모두 지원
+    text = None
+    for enc in ("utf-8-sig", "cp949", "euc-kr", "utf-8"):
+        try:
+            text = file_bytes.decode(enc)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if text is None:
+        text = file_bytes.decode("utf-8", errors="replace")
+    # 구분자 자동 감지(쉼표/세미콜론/탭)
+    first = next((ln for ln in text.splitlines() if ln.strip()), "")
+    delim = max([",", ";", "\t"], key=first.count) if first else ","
+    reader = _csv.DictReader(_io.StringIO(text), delimiter=delim)
 
     def g(row, *names):
         for k, val in row.items():
@@ -393,6 +405,11 @@ def import_nurseries_csv(file_bytes, replace=False):
                 stocks[(nid, pid)] = (_csv_int(g(row, "재고수량", "qty")),
                                       _csv_int(g(row, "최저가", "price_min")),
                                       _csv_int(g(row, "최고가", "price_max")))
+
+    if not nurseries:
+        hdr = ", ".join(reader.fieldnames or [])
+        warns.append(f"등록된 농원이 없습니다. 인식된 헤더: [{hdr}]. "
+                     "'농원명'/'농원ID' 열이 있는지, 저장 형식(CSV UTF-8 권장)을 확인하세요.")
 
     if replace:
         conn.execute("DELETE FROM stock")
@@ -1700,17 +1717,25 @@ elif page == "admin":
         if up_csv is not None and st.button("업로드 실행", type="primary",
                                             use_container_width=True):
             try:
-                res = import_nurseries_csv(up_csv.getvalue(), replace=rep)
-                st.success(f"✅ 농원 {res['nurseries']}곳 · 취급식물 {res['stocks']}건 등록 완료")
-                if res["warnings"]:
-                    with st.expander(f"⚠️ 경고 {len(res['warnings'])}건 (식물 매칭 실패 등)"):
-                        for w in res["warnings"][:80]:
-                            st.caption(w)
-                st.caption("좌측 상단 로그인 화면의 농원 목록에도 즉시 반영됩니다.")
+                ss.last_import = import_nurseries_csv(up_csv.getvalue(), replace=rep)
             except Exception as e:
-                st.error(f"업로드 실패: {type(e).__name__} — {str(e)[:200]}")
+                ss.last_import = {"error": f"{type(e).__name__} — {str(e)[:200]}"}
+            st.rerun()   # 대시보드 지표·표를 새 데이터로 갱신
+        li = ss.get("last_import")
+        if li:
+            if li.get("error"):
+                st.error(f"업로드 실패: {li['error']}")
+            elif li["nurseries"] == 0:
+                st.warning("⚠️ 등록된 농원이 없습니다. 파일 형식(CSV UTF-8)과 헤더를 확인하세요.")
+            else:
+                st.success(f"✅ 농원 {li['nurseries']}곳 · 취급식물 {li['stocks']}건 등록 완료")
+            if li.get("warnings"):
+                with st.expander(f"⚠️ 안내·경고 {len(li['warnings'])}건"):
+                    for w in li["warnings"][:80]:
+                        st.caption("· " + w)
         st.caption("※ 배포 환경(Streamlit Cloud)은 앱 재시작 시 DB가 초기화될 수 있으니, "
-                   "영구 보관은 CSV 원본을 별도 보관하세요.")
+                   "영구 보관은 CSV 원본을 별도 보관하세요. 한글 윈도우 엑셀은 "
+                   "‘다른 이름으로 저장 → CSV UTF-8’로 저장하면 가장 안전합니다.")
 
 # ══════════════ 건강 진단 ══════════════
 elif page == "diag":
