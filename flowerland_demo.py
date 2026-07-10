@@ -47,7 +47,10 @@ except ImportError:
 
 # ── 페이지/스타일 ─────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Flower Land (플라워랜드)", page_icon="🌱",
-                   layout="centered", initial_sidebar_state="collapsed")
+                   layout="wide", initial_sidebar_state="collapsed")
+
+# ── PC/모바일 콘텐츠 최대 폭 (여기 숫자만 바꾸면 전체 폭 조절됨) ──
+PC_MAX_WIDTH = "960px"   # PC에서 콘텐츠가 중앙에 이 폭으로 정렬됨(넓게: 1100px, 좁게: 820px)
 GREEN = "#2E7D32"
 st.markdown(f"""
 <style>
@@ -61,7 +64,7 @@ st.markdown(f"""
                animation:fl-rotate 0.9s linear infinite; }}
 .fl-spin-txt {{ margin-top:14px; color:{GREEN}; font-weight:700; font-size:15px; }}
 @keyframes fl-rotate {{ to {{ transform:rotate(360deg); }} }}
-.block-container {{ max-width: 480px; padding-top: 1.0rem; }}
+.block-container {{ max-width: {PC_MAX_WIDTH}; margin: 0 auto; padding-top: 1.0rem; }}
 h1,h2,h3 {{ color:{GREEN}; }}
 .step {{ color:{GREEN}; font-weight:800; font-size:15px; letter-spacing:.3px; }}
 .big  {{ font-size:24px; font-weight:800; line-height:1.35; }}
@@ -137,21 +140,23 @@ h1,h2,h3 {{ color:{GREEN}; }}
     transition: all .15s;
 }}
 
-/* ── 모바일 대응 (갤럭시 S24: 뷰포트 약 384px) ─────────────────────
-   Streamlit은 좁은 화면에서 컬럼을 세로로 쌓아버리므로,
-   배너 2열·아이콘 4열·TOP5 5열이 목업처럼 가로로 유지되게 강제한다. */
-[data-testid="stHorizontalBlock"] {{
-    flex-wrap: nowrap !important;
-    gap: 8px !important;
-    overflow-x: auto;              /* TOP5 등은 좌우 스와이프 */
-    -webkit-overflow-scrolling: touch;
-}}
+/* ── 반응형 컬럼 ──────────────────────────────────────────────
+   PC(기본)에서는 컬럼이 넓은 화면에 정상 비율로 배치되고,
+   모바일(≤640px)에서만 배너 2열·아이콘 4열·TOP5 5열을
+   목업처럼 가로로 강제한다(아래 @media 블록 참조). */
 [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
     min-width: 0 !important;
     flex: 1 1 0 !important;
 }}
 @media (max-width: 640px) {{
     .block-container {{ padding-left: .7rem; padding-right: .7rem; padding-top: .6rem; }}
+    /* 좁은 화면: 컬럼을 세로로 쌓지 말고 목업처럼 가로 유지(넘치면 스와이프) */
+    [data-testid="stHorizontalBlock"] {{
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }}
     .big  {{ font-size: 20px; }}
     .step {{ font-size: 13px; }}
     .banner {{ min-height: 150px; padding: 12px; }}
