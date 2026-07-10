@@ -220,18 +220,33 @@ def gemini_on():
 NAME_TO_PID = {}  # PLANT_NAMES 정의 후 아래에서 채움
 
 # ── 데이터 ───────────────────────────────────────────────────────────────────
-# 식물 마스터 1001종: plants_master.csv (PID·한글명·영문명·학명) 을 로드.
+# 식물 마스터(최대 3,002종): plants_master_v3.csv 등을 자동 선택해 로드.
 # dispatch.db 는 이 PID 체계로 traffic_dispatch.seed() 가 재고를 생성한다.
 import csv as _csv
 
 _MASTER = []                 # [{pid,korean,english_common,scientific,category}, ...]
-_MASTER_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plants_master.csv")
-try:
-    with open(_MASTER_CSV, encoding="utf-8") as _f:
+# 마스터 CSV 자동 선택: 최신본(v3=3002종)이 있으면 우선, 없으면 v2 → 기본순.
+#   파일명만 맞으면 검색·이미지·추천이 자동으로 전체 종에 적용된다.
+#   (이미지는 assets/plants/{PID}.png 를 PID 그대로 찾으므로 4자리 신규 PID도 정상)
+_BASE = os.path.dirname(os.path.abspath(__file__))
+_MASTER_CANDIDATES = [
+    "plants_master_v3.csv",        # 3,002종 (최신)
+    "plants_master_v2.csv",        # 2,001종
+    "plants_master.csv",           # 1,001종 (기존)
+]
+_MASTER_CSV = next((os.path.join(_BASE, _n)
+                    for _n in _MASTER_CANDIDATES
+                    if os.path.exists(os.path.join(_BASE, _n))), None)
+if _MASTER_CSV:
+    # utf-8-sig 로 열어 엑셀 저장(BOM) 파일도 안전하게 읽는다.
+    with open(_MASTER_CSV, encoding="utf-8-sig") as _f:
         for _r in _csv.DictReader(_f):
-            _MASTER.append(_r)
-except FileNotFoundError:
-    # CSV가 없을 때의 최소 폴백(앱이 죽지 않게)
+            # 열 이름 앞뒤 공백/누락 방어
+            _row = {(_k or "").strip(): (_v or "").strip() for _k, _v in _r.items()}
+            if _row.get("pid"):
+                _MASTER.append(_row)
+if not _MASTER:
+    # CSV가 없거나 비었을 때의 최소 폴백(앱이 죽지 않게)
     _MASTER = [{"pid": "P001", "korean": "몬스테라", "english_common": "Monstera",
                 "scientific": "Monstera deliciosa", "category": "관엽 Foliage"}]
 
