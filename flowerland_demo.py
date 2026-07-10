@@ -326,6 +326,8 @@ def _ensure_admin_columns(conn):
         conn.execute("ALTER TABLE nursery ADD COLUMN specialty TEXT DEFAULT ''")
     if "address" not in ncols:
         conn.execute("ALTER TABLE nursery ADD COLUMN address TEXT DEFAULT ''")
+    if "phone" not in ncols:
+        conn.execute("ALTER TABLE nursery ADD COLUMN phone TEXT DEFAULT ''")
     scols = [r[1] for r in conn.execute("PRAGMA table_info(stock)").fetchall()]
     if "price_min" not in scols:
         conn.execute("ALTER TABLE stock ADD COLUMN price_min INTEGER DEFAULT 0")
@@ -345,13 +347,18 @@ def best_nursery(pid, source):
     if not ids:
         return None
     nid = ids[0]
-    row = conn.execute("SELECT name, COALESCE(address,'') FROM nursery WHERE id=?",
-                       (nid,)).fetchone()
-    name, address = row[0], row[1]
+    try:
+        row = conn.execute("SELECT name, COALESCE(address,''), COALESCE(phone,'') "
+                           "FROM nursery WHERE id=?", (nid,)).fetchone()
+    except sqlite3.OperationalError:      # 컬럼 없음 → 마이그레이션 후 재시도
+        _ensure_admin_columns(conn)
+        row = conn.execute("SELECT name, COALESCE(address,''), COALESCE(phone,'') "
+                           "FROM nursery WHERE id=?", (nid,)).fetchone()
+    name, address, phone = row
     qty = conn.execute("SELECT qty FROM stock WHERE nursery_id=? AND plant_id=?",
                        (nid, pid)).fetchone()
-    return {"id": nid, "name": name, "address": address, "zone": zone_of(nid),
-            "qty": qty[0] if qty else 0,
+    return {"id": nid, "name": name, "address": address, "phone": phone,
+            "zone": zone_of(nid), "qty": qty[0] if qty else 0,
             "recs": 2800 + int(hashlib.md5(nid.encode()).hexdigest(), 16) % 900}
 
 def _next_nursery_id():
@@ -404,7 +411,8 @@ def import_nurseries_csv(file_bytes, replace=False):
             nid = f"U{len(nurseries) + 1:03d}"
         nurseries[nid] = (name or nid, g(row, "구역", "zone") or "A동",
                           g(row, "PIN", "pin"), g(row, "소개문구", "tagline"),
-                          g(row, "전문분야", "specialty"), g(row, "주소", "address"))
+                          g(row, "전문분야", "specialty"), g(row, "주소", "address"),
+                          g(row, "대표전화", "전화번호", "phone"))
         pname = g(row, "취급식물명", "식물명", "plant_name")
         ppid = g(row, "취급식물ID", "식물ID", "plant_id")
         if pname or ppid:
@@ -425,14 +433,15 @@ def import_nurseries_csv(file_bytes, replace=False):
         conn.execute("DELETE FROM stock")
         conn.execute("DELETE FROM nursery")
         conn.execute("DELETE FROM dispatch_log")
-    for nid, (name, zone, pin, tagline, specialty, address) in nurseries.items():
+    _ensure_admin_columns(conn)   # 주소·전화 컬럼 보장(구 DB 방어)
+    for nid, (name, zone, pin, tagline, specialty, address, phone) in nurseries.items():
         conn.execute(
-            "INSERT INTO nursery(id,name,zone,pin,tagline,specialty,address) "
-            "VALUES(?,?,?,?,?,?,?) "
+            "INSERT INTO nursery(id,name,zone,pin,tagline,specialty,address,phone) "
+            "VALUES(?,?,?,?,?,?,?,?) "
             "ON CONFLICT(id) DO UPDATE SET name=excluded.name, zone=excluded.zone, "
             "pin=excluded.pin, tagline=excluded.tagline, specialty=excluded.specialty, "
-            "address=excluded.address",
-            (nid, name, zone, pin, tagline, specialty, address))
+            "address=excluded.address, phone=excluded.phone",
+            (nid, name, zone, pin, tagline, specialty, address, phone))
     upd = datetime.now().strftime("%Y-%m")
     for (nid, pid), (qty, pmin, pmax) in stocks.items():
         conn.execute(
@@ -453,12 +462,13 @@ def kakao_map_url(nursery_name, address=""):
 
 def best_card(b, pid):
     _loc = b.get("address") or f"{b['zone']}"
+    _tel = f"<br>📞 대표전화: {b['phone']}" if b.get("phone") else ""
     st.markdown(f"""<div class='best'>
       <span class='tag'>최우수 매칭 농원</span><br>
       <b style='font-size:19px'>🌿 {b['name']}</b> <span style='color:#777'>({b['id']})</span><br>
       <span style='font-size:14px'>
       ✅ 전문성: {PLANT_NAMES.get(pid, pid)} 재배 우수<br>
-      📍 위치: {_loc} (지도 보기)<br>
+      📍 위치: {_loc} (지도 보기){_tel}<br>
       🎁 특별 서비스: 현장 화분 매칭 및 무료 분갈이 가능<br>
       👍 추천 횟수: {b['recs']:,}+ · 재고 {b['qty']}개</span></div>""",
       unsafe_allow_html=True)
@@ -1715,13 +1725,16 @@ elif page == "admin":
         st.divider()
         st.markdown("#### 🏪 농원 직접 등록·편집")
         ZONE_OPTS = ["A동", "B동", "C동", "D동", "E동", "노지구역"]
+        _ensure_admin_columns(conn)   # 주소·전화 컬럼 보장(구 DB 방어)
 
         with st.expander("➕ 새 농원 등록", expanded=False):
             with st.form("new_nursery", clear_on_submit=True):
                 fc = st.columns([2, 1])
                 nn_name = fc[0].text_input("농원명 *")
                 nn_id = fc[1].text_input("농원ID(비우면 자동)", placeholder="자동")
-                nn_addr = st.text_input("주소", placeholder="예: 대구 동구 불로동 000-0")
+                fc1 = st.columns([2, 1])
+                nn_addr = fc1[0].text_input("주소", placeholder="예: 대구 동구 불로동 000-0")
+                nn_phone = fc1[1].text_input("대표 전화번호", placeholder="예: 053-000-0000")
                 fc2 = st.columns(3)
                 nn_zone = fc2[0].selectbox("구역", ZONE_OPTS)
                 nn_pin = fc2[1].text_input("PIN(4자리)", max_chars=4)
@@ -1733,16 +1746,20 @@ elif page == "admin":
                     else:
                         nid = nn_id.strip() or _next_nursery_id()
                         conn.execute(
-                            "INSERT INTO nursery(id,name,zone,pin,tagline,specialty,address) "
-                            "VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+                            "INSERT INTO nursery(id,name,zone,pin,tagline,specialty,"
+                            "address,phone) VALUES(?,?,?,?,?,?,?,?) "
+                            "ON CONFLICT(id) DO UPDATE SET "
                             "name=excluded.name, zone=excluded.zone, pin=excluded.pin, "
                             "tagline=excluded.tagline, specialty=excluded.specialty, "
-                            "address=excluded.address",
+                            "address=excluded.address, phone=excluded.phone",
                             (nid, nn_name.strip(), nn_zone, nn_pin.strip(),
-                             nn_tag.strip(), nn_spec.strip(), nn_addr.strip()))
+                             nn_tag.strip(), nn_spec.strip(), nn_addr.strip(),
+                             nn_phone.strip()))
                         conn.commit()
-                        st.toast(f"'{nn_name.strip()}' ({nid}) 등록 완료")
+                        ss.reg_msg = f"✅ '{nn_name.strip()}' ({nid}) 등록 완료"
                         st.rerun()
+        if ss.get("reg_msg"):
+            st.success(ss.pop("reg_msg"))
 
         # 기존 농원 편집 / 삭제
         nlist = conn.execute("SELECT id, name FROM nursery ORDER BY id").fetchall()
@@ -1752,14 +1769,16 @@ elif page == "admin":
             enid = esel.split("(")[-1].rstrip(")")
             cur = conn.execute(
                 "SELECT name, COALESCE(address,''), zone, COALESCE(pin,''), "
-                "COALESCE(tagline,''), COALESCE(specialty,'') FROM nursery WHERE id=?",
-                (enid,)).fetchone()
+                "COALESCE(tagline,''), COALESCE(specialty,''), COALESCE(phone,'') "
+                "FROM nursery WHERE id=?", (enid,)).fetchone()
             ec = st.columns([2, 1])
             e_name = ec[0].text_input("농원명", value=cur[0], key=f"en_{enid}")
             e_zone = ec[1].selectbox("구역", ZONE_OPTS,
                                      index=ZONE_OPTS.index(cur[2]) if cur[2] in ZONE_OPTS else 0,
                                      key=f"ez_{enid}")
-            e_addr = st.text_input("주소", value=cur[1], key=f"ea_{enid}")
+            ec1 = st.columns([2, 1])
+            e_addr = ec1[0].text_input("주소", value=cur[1], key=f"ea_{enid}")
+            e_phone = ec1[1].text_input("대표 전화번호", value=cur[6], key=f"eph_{enid}")
             ec2 = st.columns(2)
             e_spec = ec2[0].text_input("전문분야", value=cur[5], key=f"es_{enid}")
             e_pin = ec2[1].text_input("PIN(4자리)", value=cur[3], max_chars=4, key=f"ep_{enid}")
@@ -1767,10 +1786,10 @@ elif page == "admin":
             bc = st.columns(2)
             if bc[0].button("💾 저장", type="primary", key=f"esave_{enid}",
                             use_container_width=True):
-                conn.execute("UPDATE nursery SET name=?, address=?, zone=?, pin=?, "
-                             "tagline=?, specialty=? WHERE id=?",
-                             (e_name.strip(), e_addr.strip(), e_zone, e_pin.strip(),
-                              e_tag.strip(), e_spec.strip(), enid))
+                conn.execute("UPDATE nursery SET name=?, address=?, phone=?, zone=?, "
+                             "pin=?, tagline=?, specialty=? WHERE id=?",
+                             (e_name.strip(), e_addr.strip(), e_phone.strip(), e_zone,
+                              e_pin.strip(), e_tag.strip(), e_spec.strip(), enid))
                 conn.commit(); st.success("저장되었습니다."); st.rerun()
             if bc[1].button("🗑 이 농원 삭제", key=f"edel_{enid}", use_container_width=True):
                 conn.execute("DELETE FROM stock WHERE nursery_id=?", (enid,))
@@ -1782,10 +1801,10 @@ elif page == "admin":
         st.markdown("#### 📁 농원·재고 CSV 업로드")
         st.caption("양식을 채워 올리면 농원과 취급 식물이 한 번에 등록됩니다. "
                    "같은 농원ID의 여러 줄은 한 농원의 여러 취급식물로 묶입니다.")
-        _tmpl = ("농원ID,농원명,주소,구역,소개문구,전문분야,PIN,취급식물명,취급식물ID,재고수량,최저가,최고가\n"
-                 "N001,불로원예,대구 동구 불로동 12-3,A동,50년 전통 관엽·대형목 전문,관엽·대형목,1234,몬스테라,P001,12,25000,80000\n"
-                 "N001,불로원예,대구 동구 불로동 12-3,A동,50년 전통 관엽·대형목 전문,관엽·대형목,1234,올리브나무,,5,120000,300000\n"
-                 "N002,그린가든,대구 동구 불로동 45,B동,다육·선인장 특화,다육·선인장,5678,스투키,,30,8000,20000\n")
+        _tmpl = ("농원ID,농원명,주소,대표전화,구역,소개문구,전문분야,PIN,취급식물명,취급식물ID,재고수량,최저가,최고가\n"
+                 "N001,불로원예,대구 동구 불로동 12-3,053-111-2222,A동,50년 전통 관엽·대형목 전문,관엽·대형목,1234,몬스테라,P001,12,25000,80000\n"
+                 "N001,불로원예,대구 동구 불로동 12-3,053-111-2222,A동,50년 전통 관엽·대형목 전문,관엽·대형목,1234,올리브나무,,5,120000,300000\n"
+                 "N002,그린가든,대구 동구 불로동 45,053-333-4444,B동,다육·선인장 특화,다육·선인장,5678,스투키,,30,8000,20000\n")
         st.download_button("⬇️ 빈 양식(CSV) 내려받기", ("\ufeff" + _tmpl).encode("utf-8"),
                            file_name="농원_취급식물_양식.csv", mime="text/csv",
                            use_container_width=True)
