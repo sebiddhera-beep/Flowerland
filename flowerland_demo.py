@@ -350,6 +350,71 @@ def best_nursery(pid, source):
             "qty": qty[0] if qty else 0,
             "recs": 2800 + int(hashlib.md5(nid.encode()).hexdigest(), 16) % 900}
 
+def _csv_int(v, default=0):
+    try:
+        return int(float(str(v).replace(",", "").strip()))
+    except (ValueError, TypeError):
+        return default
+
+def import_nurseries_csv(file_bytes, replace=False):
+    """CSV(농원+취급식물)를 읽어 nursery/stock 테이블에 등록.
+    · 같은 농원ID의 여러 줄은 하나의 농원으로 묶고 각 줄을 취급식물로 등록
+    · 취급식물은 ID(P001) 우선, 없으면 이름으로 카탈로그 매칭
+    · replace=True면 기존 농원·재고·배정로그를 모두 지우고 새로 등록
+    반환: {'nurseries': n, 'stocks': m, 'warnings': [...]}"""
+    import io as _io, csv as _csv
+    text = file_bytes.decode("utf-8-sig", errors="replace")
+    reader = _csv.DictReader(_io.StringIO(text))
+
+    def g(row, *names):
+        for k, val in row.items():
+            if k and k.strip() in names:
+                return (val or "").strip()
+        return ""
+
+    nurseries, stocks, warns = {}, {}, []
+    for i, row in enumerate(reader, start=2):
+        name = g(row, "농원명", "name")
+        nid = g(row, "농원ID", "id", "nursery_id")
+        if not name and not nid:
+            continue
+        if not nid:
+            nid = f"U{len(nurseries) + 1:03d}"
+        nurseries[nid] = (name or nid, g(row, "구역", "zone") or "A동",
+                          g(row, "PIN", "pin"), g(row, "소개문구", "tagline"),
+                          g(row, "전문분야", "specialty"))
+        pname = g(row, "취급식물명", "식물명", "plant_name")
+        ppid = g(row, "취급식물ID", "식물ID", "plant_id")
+        if pname or ppid:
+            pid = ppid if ppid in PLANT_NAMES else NAME_TO_PID.get(pname)
+            if not pid:
+                warns.append(f"{i}행: 식물 '{pname or ppid}'을(를) 카탈로그에서 못 찾아 건너뜀")
+            else:
+                stocks[(nid, pid)] = (_csv_int(g(row, "재고수량", "qty")),
+                                      _csv_int(g(row, "최저가", "price_min")),
+                                      _csv_int(g(row, "최고가", "price_max")))
+
+    if replace:
+        conn.execute("DELETE FROM stock")
+        conn.execute("DELETE FROM nursery")
+        conn.execute("DELETE FROM dispatch_log")
+    for nid, (name, zone, pin, tagline, specialty) in nurseries.items():
+        conn.execute(
+            "INSERT INTO nursery(id,name,zone,pin,tagline,specialty) VALUES(?,?,?,?,?,?) "
+            "ON CONFLICT(id) DO UPDATE SET name=excluded.name, zone=excluded.zone, "
+            "pin=excluded.pin, tagline=excluded.tagline, specialty=excluded.specialty",
+            (nid, name, zone, pin, tagline, specialty))
+    upd = datetime.now().strftime("%Y-%m")
+    for (nid, pid), (qty, pmin, pmax) in stocks.items():
+        conn.execute(
+            "INSERT INTO stock(nursery_id,plant_id,qty,price_min,price_max,updated_at) "
+            "VALUES(?,?,?,?,?,?) ON CONFLICT(nursery_id,plant_id) DO UPDATE SET "
+            "qty=excluded.qty, price_min=excluded.price_min, "
+            "price_max=excluded.price_max, updated_at=excluded.updated_at",
+            (nid, pid, qty, pmin, pmax, upd))
+    conn.commit()
+    return {"nurseries": len(nurseries), "stocks": len(stocks), "warnings": warns}
+
 def kakao_map_url(nursery_name):
     """농원 이름 + 불로화훼단지 주소로 카카오맵 검색 링크 생성.
     좌표(위경도) 없이도 동작. 앱 없어도 브라우저에서 열림.
@@ -1616,6 +1681,36 @@ elif page == "admin":
         }, height=430)
         st.caption("미등록·저노출 농원을 파악해 재고 등록을 독려하세요. "
                    "노출 편중이 심하면(지니↑) 알고리즘이 자동 보정합니다.")
+
+        # ── 📁 농원·재고 CSV 일괄 업로드 ──
+        st.divider()
+        st.markdown("#### 📁 농원·재고 CSV 업로드")
+        st.caption("양식을 채워 올리면 농원과 취급 식물이 한 번에 등록됩니다. "
+                   "같은 농원ID의 여러 줄은 한 농원의 여러 취급식물로 묶입니다.")
+        _tmpl = ("농원ID,농원명,구역,소개문구,전문분야,PIN,취급식물명,취급식물ID,재고수량,최저가,최고가\n"
+                 "N001,불로원예,A동,50년 전통 관엽·대형목 전문,관엽·대형목,1234,몬스테라,P001,12,25000,80000\n"
+                 "N001,불로원예,A동,50년 전통 관엽·대형목 전문,관엽·대형목,1234,올리브나무,,5,120000,300000\n"
+                 "N002,그린가든,B동,다육·선인장 특화,다육·선인장,5678,스투키,,30,8000,20000\n")
+        st.download_button("⬇️ 빈 양식(CSV) 내려받기", ("\ufeff" + _tmpl).encode("utf-8"),
+                           file_name="농원_취급식물_양식.csv", mime="text/csv",
+                           use_container_width=True)
+        up_csv = st.file_uploader("작성한 CSV 파일 선택", type=["csv"], key="nur_csv")
+        rep = st.checkbox("기존 농원·재고를 모두 지우고 새로 등록(전체 교체)", value=False,
+                          help="체크하면 시연용 80개 데모 농원을 포함해 전부 삭제 후 등록합니다.")
+        if up_csv is not None and st.button("업로드 실행", type="primary",
+                                            use_container_width=True):
+            try:
+                res = import_nurseries_csv(up_csv.getvalue(), replace=rep)
+                st.success(f"✅ 농원 {res['nurseries']}곳 · 취급식물 {res['stocks']}건 등록 완료")
+                if res["warnings"]:
+                    with st.expander(f"⚠️ 경고 {len(res['warnings'])}건 (식물 매칭 실패 등)"):
+                        for w in res["warnings"][:80]:
+                            st.caption(w)
+                st.caption("좌측 상단 로그인 화면의 농원 목록에도 즉시 반영됩니다.")
+            except Exception as e:
+                st.error(f"업로드 실패: {type(e).__name__} — {str(e)[:200]}")
+        st.caption("※ 배포 환경(Streamlit Cloud)은 앱 재시작 시 DB가 초기화될 수 있으니, "
+                   "영구 보관은 CSV 원본을 별도 보관하세요.")
 
 # ══════════════ 건강 진단 ══════════════
 elif page == "diag":
