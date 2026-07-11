@@ -100,7 +100,7 @@ h1,h2,h3 {{ color:{GREEN}; }}
 /* ── 헤더 알림 버튼: 컬럼을 채우는 흰색 둥근 박스 (스크린샷과 동일) ── */
 [data-testid="stPopover"] button {{
     background:#ffffff !important; border:1px solid #e3e3e3 !important;
-    border-radius:16px !important; min-height:46px !important;
+    border-radius:16px !important; min-height:43px !important;
     font-weight:700 !important; color:#2E5D32 !important;
     box-shadow:0 1px 3px rgba(0,0,0,.04) !important;
 }}
@@ -594,15 +594,26 @@ def clickable_image(path, key, aspect="351/416", fit="100% 100%", frame=True,
     else:                                                # 테두리·배경 없음
         box = "border: none; background-color: transparent;"
         hov = "opacity: .82;"
-    if hug and height:      # 내용 폭으로 축소: 높이 고정 + aspect로 폭 자동
-        size_rule = f"height: {height}; aspect-ratio: {aspect}; width: auto;"
+    if hug and height:      # 내용 폭으로 축소: 높이 고정 + aspect로 폭을 명시(px)해 클릭영역 정확히 일치
+        try:
+            _hpx = float(str(height).replace("px", "").strip())
+            _aw, _ah = (str(aspect).split("/") + ["1"])[:2]
+            _wpx = _hpx * (float(_aw) / float(_ah))
+            size_rule = (f"height: {height}; width: {_wpx:.0f}px; "
+                         f"box-sizing: content-box;")
+        except Exception:
+            size_rule = f"height: {height}; aspect-ratio: {aspect}; width: auto;"
     elif height:
         size_rule = f"height: {height}; width: 100%;"
     else:
         size_rule = f"aspect-ratio: {aspect}; height: auto; width: 100%;"
     pad_rule  = f"padding: {pad}; background-origin: content-box;" if pad else ""
     bgcolor   = f" {bg}" if bg else ""
+    # hug 로고는 컬럼 안에서 항상 왼쪽 고정(가운데로 밀려 좌우 틀어지는 것 방지)
+    container_rule = (f".st-key-{key} {{ display:flex; justify-content:flex-start; }}"
+                      if hug else "")
     st.markdown(f"""<style>
+    {container_rule}
     .st-key-{key} button {{
         background: url("data:image/png;base64,{_b64(path)}") {pos} / {fit} no-repeat{bgcolor};
         {size_rule} {box} {pad_rule}
@@ -866,20 +877,20 @@ def place_stage(pid, key="stage", height=None):
         _aspect = (_w / _h) if _h else 1.4
     except Exception:
         _aspect = 1.4
-    if height is None:                       # 데스크톱 최대폭(640) 기준 + 여유, 모바일은 JS가 조임
-        height = int(min(560, max(180, 640 / _aspect + 24)))
+    if height is None:                       # 모바일 실제 폭(~400px) 기준 추정 → JS가 실제값으로 재조정
+        height = int(min(720, max(150, 400 / _aspect + 16)))
     ill = plant_illust(pid)
     _pi = _white_to_transparent(ill) if ill else \
         draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
     _buf = io.BytesIO(); _pi.save(_buf, "PNG")
     plant_b64 = base64.b64encode(_buf.getvalue()).decode()
     components.html(f"""
-    <style>html,body{{margin:0;padding:0;overflow:hidden;}}</style>
-    <div id="{key}" style="position:relative; width:100%; max-width:640px; margin:0 auto;
+    <style>html,body{{margin:0;padding:0;overflow:hidden;height:100%;}}</style>
+    <div id="{key}" style="position:relative; width:100%; height:100%; max-width:640px; margin:0 auto;
          touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
          box-shadow:0 2px 10px rgba(0,0,0,.15);">
       <img src="data:image/jpeg;base64,{bg_b64}"
-           style="width:100%; display:block; pointer-events:none;">
+           style="width:100%; height:100%; object-fit:cover; display:block; pointer-events:none;">
       <img id="{key}_p" src="data:image/png;base64,{plant_b64}"
            style="position:absolute; left:60%; top:62%; width:40%; height:auto;
                   transform:translate(-50%,-50%); cursor:grab;
@@ -922,20 +933,24 @@ def place_stage(pid, key="stage", height=None):
           apply(); e.preventDefault(); }}
       }},{{passive:false}});
       stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
-      // ── iframe 높이를 사진 실제 높이에 맞춰 자동 조정(사진 아래 빈 공간 제거) ──
+      // ── iframe + 상위 래퍼 높이를 사진 실제 높이에 맞춰 축소(사진 아래 빈 공간 제거) ──
       function fitFrame(){{
         try{{
           const fh=Math.ceil(stage.getBoundingClientRect().height);
           if(fh>0 && window.frameElement){{
-            window.frameElement.style.height=fh+'px';
-            window.frameElement.setAttribute('height', fh);
+            let el=window.frameElement;
+            for(let i=0;i<5 && el && el.style;i++){{      // iframe→래퍼 상위 몇 단계까지
+              el.style.height=fh+'px'; el.style.minHeight='0px';
+              el=el.parentElement;
+            }}
           }}
         }}catch(e){{}}
       }}
       const _bg=stage.querySelector('img');
       if(_bg && _bg.complete) fitFrame(); else if(_bg) _bg.addEventListener('load',fitFrame);
       window.addEventListener('resize',fitFrame);
-      setTimeout(fitFrame,60); setTimeout(fitFrame,300); setTimeout(fitFrame,900);
+      try{{ new ResizeObserver(fitFrame).observe(stage); }}catch(e){{}}
+      [60,200,500,1000,2000].forEach(t=>setTimeout(fitFrame,t));
       apply();
     }})();
     </script>
