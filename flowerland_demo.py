@@ -1852,6 +1852,54 @@ elif page == "admin":
         ZONE_OPTS = ["A동", "B동", "C동", "D동", "E동", "노지구역"]
         _ensure_admin_columns(conn)   # 주소·전화 컬럼 보장(구 DB 방어)
 
+        # ── 📄 CSV 파일로 일괄 등록·수정 (엑셀에서 표로 작성 가능) ──
+        with st.expander("📄 CSV 파일로 일괄 등록·수정 (엑셀)", expanded=False):
+            st.caption("엑셀에서 농원·취급식물을 표로 작성해 한 번에 등록/수정합니다. "
+                       "같은 농원은 취급식물별로 여러 줄로 적으세요. "
+                       "(한글 인코딩·쉼표/탭 자동 인식, 농원ID 비우면 자동 생성)")
+            _sample = (
+                "농원명,농원ID,구역,PIN,주소,대표전화,전문분야,소개문구,취급식물명,재고수량,최저가,최고가\n"
+                "행복농원,N901,A동,1234,대구 동구 불로동 123-4,053-111-2222,관엽,30년 전통 관엽 전문,몬스테라,20,15000,45000\n"
+                "행복농원,N901,A동,1234,대구 동구 불로동 123-4,053-111-2222,관엽,30년 전통 관엽 전문,스킨답서스,15,8000,20000\n"
+                "초록뜰,N902,B동,5678,대구 동구 불로동 200-1,053-333-4444,다육,다육·선인장 전문,금전수,12,10000,30000\n"
+            )
+            st.download_button("⬇️ 양식(템플릿) CSV 내려받기", _sample.encode("utf-8-sig"),
+                               file_name="농원등록_양식.csv", mime="text/csv",
+                               use_container_width=True)
+            up = st.file_uploader("작성한 CSV 업로드", type=["csv"], key="nur_csv_up")
+            if up is not None:
+                raw = up.getvalue()
+                try:
+                    parsed = parse_nurseries_csv(raw)
+                except Exception as e:
+                    st.error(f"CSV를 읽지 못했습니다: {e}"); parsed = None
+                if parsed is not None:
+                    st.info(f"인식 결과 — 농원 {len(parsed['nurseries'])}곳 · "
+                            f"취급식물 {len(parsed['stocks'])}건 · "
+                            f"인코딩 {parsed['encoding']} · 구분자 {parsed['delimiter']}")
+                    if parsed["headers"]:
+                        st.caption("인식된 열: " + ", ".join(parsed["headers"]))
+                    for w in parsed["warnings"][:8]:
+                        st.warning(w)
+                    if parsed["nurseries"]:
+                        _prev = list(parsed["nurseries"].items())[:12]
+                        st.dataframe({
+                            "농원ID": [k for k, _ in _prev],
+                            "농원명": [v[0] for _, v in _prev],
+                            "구역":  [v[1] for _, v in _prev],
+                            "주소":  [v[5] for _, v in _prev],
+                        }, use_container_width=True)
+                    repl = st.checkbox("⚠️ 기존 농원·재고 전체 삭제 후 이 파일로 교체",
+                                       value=False, key="nur_csv_replace")
+                    if st.button("📥 이 CSV로 등록/수정 실행", type="primary",
+                                 use_container_width=True, key="nur_csv_import"):
+                        res = import_nurseries_csv(raw, replace=repl, parsed=parsed)
+                        st.success(f"✅ 완료 — 농원 {res['nurseries']}곳, "
+                                   f"취급식물 {res['stocks']}건 반영")
+                        for w in res["warnings"][:8]:
+                            st.warning(w)
+                        st.rerun()
+
         with st.expander("➕ 새 농원 등록", expanded=False):
             with st.form("new_nursery", clear_on_submit=True):
                 fc = st.columns([2, 1])
