@@ -135,7 +135,7 @@ h1,h2,h3 {{ color:{GREEN}; }}
 /* ── TOP5 일러스트 카드 이름표 ── */
 .top5-name {{
     text-align: center; font-size: 12.5px; font-weight: 700;
-    color: #2E5D32; margin-top: -6px; line-height: 1.3;
+    color: #FFFFFF; margin-top: 6px; line-height: 1.3;
 }}
 
 /* ── TOP5 카드 버튼 (key='top_*') ── */
@@ -1488,7 +1488,7 @@ if page == "home":
         with col:
             img = plant_illust(pid)
             if img:
-                if clickable_image(_thumb(img), f"imgbtn_top_{pid}", "2/3", fit="contain"):
+                if clickable_image(_thumb(img), f"imgbtn_top_{pid}", "2/3", fit="cover"):
                     ss.plant_pid = pid
                     go("plant")
                 st.markdown(f"<div class='top5-name'>{rank}. {PLANT_NAMES[pid]}</div>",
