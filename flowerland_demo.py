@@ -1092,7 +1092,7 @@ def plant_picker(recs, key):
             ill = plant_illust(rp)
             if ill:      # 사진 자체가 선택 버튼
                 picked = clickable_image(
-                    _thumb(ill, 240), f"{key}_{i}_{rp}", aspect="1/1",
+                    _thumb(ill, 280), f"{key}_{i}_{rp}", aspect="3/4",
                     fit="contain",
                     bg="#DFF3E0" if rp == sel else "#F5F5F5", pad="6px")
             else:        # 일러스트 없으면 이름 버튼 폴백
@@ -1102,9 +1102,9 @@ def plant_picker(recs, key):
             _c = GREEN if rp == sel else "#444"
             st.markdown(
                 f"<div style='text-align:center; font-weight:700; color:{_c}; "
-                f"font-size:clamp(8.5px, 2.2vw, 13px); white-space:nowrap; "
+                f"font-size:clamp(10.5px, 2.9vw, 14px); white-space:nowrap; "
                 f"overflow:hidden; text-overflow:ellipsis; margin-top:-4px'>"
-                f"{'✅ ' if rp == sel else ''}{PLANT_NAMES[rp]}</div>",
+                f"{PLANT_NAMES[rp]}</div>",
                 unsafe_allow_html=True)
             if picked and rp != sel:
                 ss.sp_pid = rp; st.rerun()
@@ -1705,7 +1705,7 @@ elif page == "space":
             gap:10px !important; }
         [class*="st-key-mode_sel"] [role="radiogroup"] label { white-space:nowrap; }
         [class*="st-key-mode_sel"] [role="radiogroup"] label p {
-            font-size:clamp(9.5px, 3vw, 14px) !important; white-space:nowrap; }
+            font-size:clamp(12px, 3.4vw, 15px) !important; white-space:nowrap; }
         </style>""", unsafe_allow_html=True)
         try:
             _g2 = st.container(key="st2_grp")
@@ -1757,7 +1757,11 @@ elif page == "space":
                         place_stage(pid, key="st2")  # 실패 시 수동 배치로 자동 대체
 
         # ── 추천 식물 5종: 사진 바로 아래 · 식물 사진을 탭하면 선택 ──
-        st.markdown("#### 🌿 추천 식물 5종 · 식물 사진을 탭하면 위에 올라옵니다")
+        st.markdown("<div style='font-weight:800; color:#2E7D32; margin:6px 0 2px; "
+                    "font-size:clamp(11px, 3.5vw, 16px); white-space:nowrap; "
+                    "overflow:hidden; text-overflow:ellipsis;'>"
+                    "🌿 추천 식물 5종 · 식물 사진을 탭하면 위에 올라옵니다</div>",
+                    unsafe_allow_html=True)
         plant_picker(recs, "pick2")
 
         # ── 선택한 식물의 상세 안내 (AI 요약, 식물별 캐시) ──
@@ -1781,7 +1785,8 @@ elif page == "space":
         match = ss.get("sp_match", 95 + h % 5)
         st.markdown("<div class='step'>3단계: 나의 최적 식물 & 농원</div>",
                     unsafe_allow_html=True)
-        st.markdown(f"<div class='big'>{USER_NAME}님! 이 식물이 당신의 {ss.room}과 "
+        st.markdown(f"<div class='big fit1' style='font-size:clamp(12px, 3.5vw, 20px)'>"
+                    f"??님! 이 식물이 당신의 {ss.room}과 "
                     f"{match}% 어울립니다!</div>", unsafe_allow_html=True)
 
         # ── 식물 선택 탭(위) → 사진(아래) 밀착 배치: 탭하면 아래 사진에 즉시 반영 ──
