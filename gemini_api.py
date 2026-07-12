@@ -25,6 +25,12 @@ import requests
 BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 MODEL_TEXT = "gemini-2.5-flash"
 MODEL_IMAGE = "gemini-2.5-flash-image"
+# 이미지 모델이 404/400 등으로 안 될 때 순서대로 시도할 후보(모델명·버전 변경 대비)
+IMAGE_MODELS = [
+    "gemini-2.5-flash-image",
+    "gemini-3.1-flash-image-preview",
+    "gemini-2.5-flash-image-preview",
+]
 TIMEOUT = 60
 
 
@@ -46,7 +52,13 @@ def _post(key, model, body):
     r = requests.post(f"{BASE}/{model}:generateContent",
                       params={"key": key},
                       json=body, timeout=TIMEOUT)
-    r.raise_for_status()
+    if not r.ok:
+        # HTTPError만으론 원인을 알 수 없어, API가 돌려준 실제 에러 메시지를 예외에 포함
+        try:
+            msg = r.json().get("error", {}).get("message", "")[:400]
+        except Exception:
+            msg = r.text[:400]
+        raise RuntimeError(f"[{model}] {r.status_code} {r.reason}: {msg}")
     return r.json()
 
 
@@ -67,18 +79,34 @@ def ask_json(key, prompt, images=None, model=MODEL_TEXT):
     return json.loads(text)
 
 
-def make_image(key, prompt, images=None, model=MODEL_IMAGE):
-    """이미지 합성/생성 → PNG bytes (첫 번째 이미지 파트). 실패 시 예외."""
+def make_image(key, prompt, images=None, model=None):
+    """이미지 합성/생성 → PNG bytes (첫 번째 이미지 파트). 실패 시 예외.
+    model 미지정 시 IMAGE_MODELS 후보를 순서대로 시도(모델명/버전 문제 자동 회피)."""
     body = {
         "contents": [{"parts": _parts(prompt, images)}],
-        "generationConfig": {"responseModalities": ["IMAGE", "TEXT"]},
+        "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
     }
-    data = _post(key, model, body)
-    for p in data["candidates"][0]["content"]["parts"]:
-        inline = p.get("inline_data") or p.get("inlineData")
-        if inline and inline.get("data"):
-            return base64.b64decode(inline["data"])
-    raise RuntimeError("응답에 이미지가 없습니다: " + json.dumps(data)[:300])
+    models = [model] if model else IMAGE_MODELS
+    last_err = None
+    for m in models:
+        try:
+            data = _post(key, m, body)
+            for p in data["candidates"][0]["content"]["parts"]:
+                inline = p.get("inline_data") or p.get("inlineData")
+                if inline and inline.get("data"):
+                    return base64.b64decode(inline["data"])
+            last_err = RuntimeError(f"[{m}] 응답에 이미지가 없습니다: "
+                                    + json.dumps(data)[:300])
+        except Exception as e:
+            last_err = e
+            emsg = str(e)
+            # 모델 없음(404)·미지원·잘못된 요청(400)이면 다음 후보 모델로 계속 시도.
+            # 그 외(403 권한, 429 할당량 초과 등)는 재시도 무의미 → 즉시 중단.
+            if any(t in emsg for t in ("404", "400", "not found", "not supported",
+                                        "NOT_FOUND", "INVALID_ARGUMENT")):
+                continue
+            break
+    raise last_err or RuntimeError("이미지 생성 실패")
 
 
 # ── 플라워랜드 전용 프롬프트 ─────────────────────────────────────────────────

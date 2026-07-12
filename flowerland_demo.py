@@ -520,6 +520,24 @@ def import_nurseries_csv(file_bytes, replace=False, parsed=None):
     conn.commit()
     return {"nurseries": len(nurseries), "stocks": len(stocks), "warnings": warns}
 
+# ── 폴더의 농원등록_양식.csv를 앱 시작 시 자동 반영(기본 농원 데이터·항상 참조) ──
+NURSERY_CSV_PATH = os.path.join(_BASE, "농원등록_양식.csv")
+
+@st.cache_resource
+def _load_default_nursery_csv():
+    """레포 폴더에 농원등록_양식.csv가 있으면 앱 시작 시 1회 자동 반영한다.
+    dispatch.db는 재시작 시 초기화될 수 있지만, 레포에 커밋된 이 CSV는 유지되므로
+    농원 데이터가 재시작 후에도 자동 복원된다(=항상 이 파일을 기본값으로 참조)."""
+    if not os.path.exists(NURSERY_CSV_PATH):
+        return None
+    try:
+        with open(NURSERY_CSV_PATH, "rb") as f:
+            return import_nurseries_csv(f.read(), replace=False)
+    except Exception as e:
+        return {"error": str(e)}
+
+_DEFAULT_CSV_RESULT = _load_default_nursery_csv()
+
 def kakao_map_url(nursery_name, address=""):
     """농원 주소(있으면) 또는 이름+불로화훼단지로 카카오맵 검색 링크 생성.
     좌표(위경도) 없이도 동작. 앱 없어도 브라우저에서 열림."""
@@ -963,7 +981,7 @@ def plant_picker(recs, key):
     if sel not in recs:
         sel = recs[0]; ss.sp_pid = sel
     cols = st.columns(len(recs))
-    for col, rp in zip(cols, recs):
+    for i, (col, rp) in enumerate(zip(cols, recs)):
         with col:
             ill = plant_illust(rp)
             if ill:
@@ -972,7 +990,7 @@ def plant_picker(recs, key):
                 st.markdown("<div style='text-align:center;font-size:36px'>🌿</div>",
                             unsafe_allow_html=True)
             if st.button(("✅ " if rp == sel else "") + PLANT_NAMES[rp],
-                         key=f"{key}_{rp}", use_container_width=True,
+                         key=f"{key}_{i}_{rp}", use_container_width=True,
                          type="primary" if rp == sel else "secondary"):
                 ss.sp_pid = rp; st.rerun()
     return sel
@@ -1503,17 +1521,17 @@ elif page == "space":
         # ── Gemini 실분석 ──
         if gemini_on() and ss.get("sp_ai_h") != h:
             try:
-                with st.spinner(f"🤖 Gemini가 {ss.room} 사진을 분석하는 중..."):
+                with st.spinner(f"🤖 Flowerland가 {ss.room} 사진을 분석하는 중..."):
                     res = gm.analyze_space(api_key, ss.sp_img, ss.room,
                                            list(PLANT_NAMES.values()))
                 ss.sp_ai, ss.sp_ai_h = res, h
             except Exception as e:
-                st.warning(f"Gemini 호출 실패 — 목업 모드로 대체 ({type(e).__name__})")
+                st.warning(f"AI 분석 실패 — 기본 분석으로 대체 ({type(e).__name__})")
                 ss.sp_ai = None; ss.sp_ai_h = h
         ai = ss.get("sp_ai") if ss.get("sp_ai_h") == h else None
 
         st.markdown("<div class='step'>2단계: 정밀 분석 & 가상 배치"
-                    + (" · 🤖 Gemini" if ai else " · 목업") + "</div>",
+                    + (" · 🤖 Flowerland" if ai else " · 기본 분석") + "</div>",
                     unsafe_allow_html=True)
         st.markdown(f"<div class='big'>AI가 당신의 {ss.room}을 분석했습니다!</div>",
                     unsafe_allow_html=True)
@@ -1548,6 +1566,15 @@ elif page == "space":
             ss.sp_match = 95 + h % 5
             ss.sp_reason = ""
         # ── 추천 식물 5종 준비 + 배치할 식물 확정 ──
+        # 중복 PID 제거(순서 유지) → plant_picker 버튼 키 충돌 방지
+        _seen = set(); recs = [p for p in recs if not (p in _seen or _seen.add(p))]
+        _fb_all = (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
+        for p in _fb_all:                        # 5종 미만이면 기본 추천으로 보충
+            if len(recs) >= 5:
+                break
+            if p not in _seen:
+                recs.append(p); _seen.add(p)
+        recs = recs[:5] or _fb_all[:5]
         ss.sp_recs = recs
         if ss.get("sp_pid") not in recs:
             ss.sp_pid = recs[0]
@@ -1555,7 +1582,7 @@ elif page == "space":
 
         # ── 가상 배치 (기존 3단계를 여기로 병합) ──
         st.markdown("##### 🪴 가상 배치 체험")
-        mode = st.radio("합성 방식", ["🎚️ 수동 배치", "🤖 AI 실사 합성 (Gemini)"],
+        mode = st.radio("합성 방식", ["🎚️ 수동 배치", "🤖 AI 실사 합성 (Flowerland)"],
                         horizontal=True, index=0)   # 수동 배치가 기본
         if mode.startswith("🎚️"):
             st.caption("✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 "
@@ -1563,24 +1590,29 @@ elif page == "space":
             place_stage(pid, key="st2")             # 확정 버튼 없이 실시간 배치
         else:
             if not gemini_on():
-                st.warning("사이드바에 Gemini API 키를 입력하면 실사 합성이 가능합니다.")
+                st.warning("AI 실사 합성을 쓰려면 사이드바에서 AI 키를 입력하세요.")
             else:
                 cache_key = (h, pid)
                 if ss.get("comp_key") != cache_key:
                     try:
-                        with st.spinner(f"🤖 Gemini가 {PLANT_NAMES[pid]}을(를) "
+                        with st.spinner(f"🤖 Flowerland가 {PLANT_NAMES[pid]}을(를) "
                                         f"{ss.room}에 합성하는 중... (10~20초)"):
                             ss.comp_img = gm.composite_plant_ai(
                                 api_key, ss.sp_img, PLANT_NAMES[pid], ss.room)
-                        ss.comp_key = cache_key
+                        ss.comp_key = cache_key; ss.comp_err = None
                     except Exception as e:
-                        st.warning(f"합성 실패 — 수동 배치를 사용하세요 ({type(e).__name__})")
                         ss.comp_img = None; ss.comp_key = cache_key
+                        ss.comp_err = f"{type(e).__name__}: {e}"
                 if ss.get("comp_img"):
                     st.image(ss.comp_img, use_container_width=True,
-                             caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Gemini)")
+                             caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Flowerland)")
                     if st.button("🔄 다시 합성하기", use_container_width=True):
                         ss.comp_key = None; st.rerun()
+                elif ss.get("comp_err"):
+                    st.warning("AI 실사 합성에 실패했어요 — 아래 **수동 배치**를 사용해 주세요.")
+                    with st.expander("오류 상세 보기 (관리자용)"):
+                        st.code(ss.comp_err)
+                    place_stage(pid, key="st2")     # 실패 시 수동 배치로 자동 대체
 
         # ── 사진 아래: 분석 라인(창문방향…여백) + 종합 추천 지표 (첨부 이미지 순서) ──
         chips = " &nbsp;·&nbsp; ".join(
@@ -1867,8 +1899,18 @@ elif page == "admin":
         ZONE_OPTS = ["A동", "B동", "C동", "D동", "E동", "노지구역"]
         _ensure_admin_columns(conn)   # 주소·전화 컬럼 보장(구 DB 방어)
 
-        # ── 📄 CSV 파일로 일괄 등록·수정 (엑셀에서 표로 작성 가능) ──
+        # ── 📄 CSV 일괄 등록·수정 (폴더의 농원등록_양식.csv를 항상 기본값으로 참조) ──
         with st.expander("📄 CSV 파일로 일괄 등록·수정 (엑셀)", expanded=False):
+            # 폴더 CSV 자동 반영 상태
+            if _DEFAULT_CSV_RESULT and "error" not in _DEFAULT_CSV_RESULT:
+                st.success(f"✅ 폴더의 **농원등록_양식.csv**를 기본값으로 자동 반영 중 "
+                           f"(농원 {_DEFAULT_CSV_RESULT['nurseries']}곳 · "
+                           f"취급식물 {_DEFAULT_CSV_RESULT['stocks']}건). 재시작해도 자동 복원됩니다.")
+            elif _DEFAULT_CSV_RESULT and "error" in _DEFAULT_CSV_RESULT:
+                st.warning(f"폴더 농원등록_양식.csv 읽기 오류: {_DEFAULT_CSV_RESULT['error']}")
+            else:
+                st.info("폴더에 **농원등록_양식.csv**가 아직 없습니다. 아래에서 업로드하면 "
+                        "이 이름으로 저장되어 항상 기본값으로 참조됩니다. (영구 보관은 레포 커밋)")
             st.caption("엑셀에서 농원·취급식물을 표로 작성해 한 번에 등록/수정합니다. "
                        "같은 농원은 취급식물별로 여러 줄로 적으세요. "
                        "(한글 인코딩·쉼표/탭 자동 인식, 농원ID 비우면 자동 생성)")
@@ -1877,10 +1919,17 @@ elif page == "admin":
                 "행복농원,N901,A동,1234,대구 동구 불로동 123-4,053-111-2222,관엽,30년 전통 관엽 전문,몬스테라,20,15000,45000\n"
                 "행복농원,N901,A동,1234,대구 동구 불로동 123-4,053-111-2222,관엽,30년 전통 관엽 전문,스킨답서스,15,8000,20000\n"
                 "초록뜰,N902,B동,5678,대구 동구 불로동 200-1,053-333-4444,다육,다육·선인장 전문,금전수,12,10000,30000\n"
-            )
-            st.download_button("⬇️ 양식(템플릿) CSV 내려받기", _sample.encode("utf-8-sig"),
-                               file_name="농원등록_양식.csv", mime="text/csv",
-                               use_container_width=True)
+            ).encode("utf-8-sig")
+            _dl_bytes, _dl_label = _sample, "⬇️ 빈 양식(템플릿) CSV 내려받기"
+            if os.path.exists(NURSERY_CSV_PATH):     # 폴더에 파일 있으면 그걸 편집용으로 제공
+                try:
+                    with open(NURSERY_CSV_PATH, "rb") as _f:
+                        _dl_bytes = _f.read()
+                    _dl_label = "⬇️ 현재 폴더의 농원등록_양식.csv 내려받기(편집용)"
+                except Exception:
+                    pass
+            st.download_button(_dl_label, _dl_bytes, file_name="농원등록_양식.csv",
+                               mime="text/csv", use_container_width=True)
             up = st.file_uploader("작성한 CSV 업로드", type=["csv"], key="nur_csv_up")
             if up is not None:
                 raw = up.getvalue()
@@ -1906,11 +1955,27 @@ elif page == "admin":
                         }, use_container_width=True)
                     repl = st.checkbox("⚠️ 기존 농원·재고 전체 삭제 후 이 파일로 교체",
                                        value=False, key="nur_csv_replace")
+                    _save = st.checkbox("💾 이 파일을 폴더의 농원등록_양식.csv로 저장(항상 기본값 참조)",
+                                        value=True, key="nur_csv_save")
                     if st.button("📥 이 CSV로 등록/수정 실행", type="primary",
                                  use_container_width=True, key="nur_csv_import"):
                         res = import_nurseries_csv(raw, replace=repl, parsed=parsed)
+                        saved = False
+                        if _save:
+                            try:
+                                with open(NURSERY_CSV_PATH, "wb") as _f:
+                                    _f.write(raw)
+                                _load_default_nursery_csv.clear()   # 다음 시작 시 재로드
+                                saved = True
+                            except Exception as e:
+                                st.warning(f"폴더 저장 실패(읽기전용 환경일 수 있음): {e}")
                         st.success(f"✅ 완료 — 농원 {res['nurseries']}곳, "
-                                   f"취급식물 {res['stocks']}건 반영")
+                                   f"취급식물 {res['stocks']}건 반영"
+                                   + (" · 농원등록_양식.csv 저장됨" if saved else ""))
+                        if saved:
+                            st.info("영구 보관하려면 이 **농원등록_양식.csv**를 GitHub 레포에 커밋하세요. "
+                                    "(Streamlit Cloud는 재시작 시 임시 파일이 사라질 수 있어, "
+                                    "레포에 커밋해야 재배포 후에도 유지됩니다.)")
                         for w in res["warnings"][:8]:
                             st.warning(w)
                         st.rerun()
