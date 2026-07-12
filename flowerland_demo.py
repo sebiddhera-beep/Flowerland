@@ -1447,7 +1447,7 @@ if page == "home":
     b1, b2 = st.columns(2)
     with b1:
         if asset("MBTI.png"):
-            if clickable_image(asset("MBTI.png"), "imgbtn_face", "351/415"):
+            if clickable_image(asset("MBTI.png"), "imgbtn_face", "351/417"):
                 ss.face_step = 1; go("face")
         else:
             st.markdown("""<div class='banner banner-fun'><span class='chip'>재미 레이어</span><br>
@@ -1477,7 +1477,7 @@ if page == "home":
             ss.search_q = q.strip(); go("search")
     cols = st.columns(4)
     ICON_FILES = ["MAP.png", "Port.png", "TREE.png", "CARE.png"]
-    ICON_ASPECT = ["165/222", "172/222", "172/222", "172/222"]
+    ICON_ASPECT = ["165/218", "172/222", "172/222", "172/222"]
     for col, e, ic, asp, t, s, tgt in zip(cols, "🗺️🪴🔍💧", ICON_FILES, ICON_ASPECT,
             ["농원 지도", "분갈이·화분 특화", "식물 건강 진단", "내 식물 관리"],
             ["40개 농원 안내", "특화 농원 보기", "시든 식물 처방", "물·영양 알림"],
