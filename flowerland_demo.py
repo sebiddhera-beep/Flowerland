@@ -1735,7 +1735,7 @@ elif page == "space":
                         place_stage(pid, key="st2")  # 실패 시 수동 배치로 자동 대체
 
             # ── 추천 식물 5종: 사진 바로 아래 밀착 · 식물 사진을 탭하면 선택 ──
-            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:2px 0 6px; "
+            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:2px 0 12px; "
                         "font-size:clamp(11px, 3.5vw, 16px); white-space:nowrap; "
                         "overflow:hidden; text-overflow:ellipsis;'>"
                         "🌿 추천 식물 5종 · 식물 사진을 탭하면 위에 올라옵니다</div>",
