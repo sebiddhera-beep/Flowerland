@@ -937,11 +937,11 @@ def place_stage(pid, key="stage", height=None):
     plant_b64 = base64.b64encode(_buf.getvalue()).decode()
     components.html(f"""
     <style>html,body{{margin:0;padding:0;overflow:hidden;height:100%;}}</style>
-    <div id="{key}" style="position:relative; width:100%; height:100%; max-width:380px; margin:0 auto;
+    <div id="{key}" style="position:relative; width:100%; max-width:380px; margin:0 auto;
          touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
          box-shadow:0 2px 10px rgba(0,0,0,.15);">
       <img src="data:image/jpeg;base64,{bg_b64}"
-           style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none;">
+           style="width:100%; height:auto; display:block; pointer-events:none;">
       <img id="{key}_p" src="data:image/png;base64,{plant_b64}"
            style="position:absolute; left:60%; top:62%; width:40%; height:auto;
                   transform:translate(-50%,-50%); cursor:grab;
@@ -984,16 +984,21 @@ def place_stage(pid, key="stage", height=None):
           apply(); e.preventDefault(); }}
       }},{{passive:false}});
       stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
-      // ── iframe + 상위 래퍼 높이를 사진 실제 높이에 맞춰 조정(노트북=확대, 모바일=축소) ──
+      // ── iframe 높이를 사진 실제 높이에 맞춰 조정 ──
+      // 주의: 상위 부모(stVerticalBlock 등)까지 높이를 고정하면 그 블록에 담긴
+      //       이후 콘텐츠 전체가 잘려 PC에서 '화면 절반만' 보이는 버그가 생긴다.
+      //       → iframe 자신 + 직속 래퍼(이 iframe만 담는 element-container)까지만 조정.
       function fitFrame(){{
         try{{
           const fh=Math.ceil(stage.getBoundingClientRect().height);
           if(fh>0 && window.frameElement){{
-            let el=window.frameElement;
-            for(let i=0;i<5 && el && el.style;i++){{      // iframe→래퍼 상위 몇 단계까지
-              el.style.height=fh+'px'; el.style.minHeight='0px';
-              el.style.maxHeight='none';                 // 확대가 max-height에 막히지 않게
-              el=el.parentElement;
+            const ifr=window.frameElement;
+            ifr.style.height=fh+'px'; ifr.setAttribute('height', fh);
+            ifr.style.minHeight='0px'; ifr.style.maxHeight='none';
+            const wrap=ifr.parentElement;      // 직속 래퍼 1단계만
+            if(wrap && wrap.style){{
+              wrap.style.height=fh+'px'; wrap.style.minHeight='0px';
+              wrap.style.maxHeight='none';
             }}
           }}
         }}catch(e){{}}
