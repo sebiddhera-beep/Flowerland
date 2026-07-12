@@ -52,8 +52,6 @@ def _parts(prompt, images):
 def _post(key, model, body):
     r = requests.post(f"{BASE}/{model}:generateContent",
                       params={"key": key},
-                      headers={"x-goog-api-key": key,
-                               "Content-Type": "application/json"},
                       json=body, timeout=TIMEOUT)
     if not r.ok:
         # HTTPError만으론 원인을 알 수 없어, API가 돌려준 실제 에러 메시지를 예외에 포함
