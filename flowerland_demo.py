@@ -1081,7 +1081,7 @@ def plant_picker(recs, key):
             st.markdown(
                 f"<div style='text-align:center; font-weight:700; color:{_c}; "
                 f"font-size:clamp(10.5px, 2.9vw, 14px); white-space:nowrap; "
-                f"overflow:hidden; text-overflow:ellipsis; margin-top:-4px'>"
+                f"overflow:hidden; text-overflow:ellipsis; margin:6px 0 2px'>"
                 f"{PLANT_NAMES[rp]}</div>",
                 unsafe_allow_html=True)
             if picked and rp != sel:
@@ -1735,7 +1735,7 @@ elif page == "space":
                         place_stage(pid, key="st2")  # 실패 시 수동 배치로 자동 대체
 
             # ── 추천 식물 5종: 사진 바로 아래 밀착 · 식물 사진을 탭하면 선택 ──
-            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:2px 0 0; "
+            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:2px 0 6px; "
                         "font-size:clamp(11px, 3.5vw, 16px); white-space:nowrap; "
                         "overflow:hidden; text-overflow:ellipsis;'>"
                         "🌿 추천 식물 5종 · 식물 사진을 탭하면 위에 올라옵니다</div>",
