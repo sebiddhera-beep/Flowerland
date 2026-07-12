@@ -100,7 +100,7 @@ h1,h2,h3 {{ color:{GREEN}; }}
 /* ── 헤더 알림 버튼: 컬럼을 채우는 흰색 둥근 박스 (스크린샷과 동일) ── */
 [data-testid="stPopover"] button {{
     background:#ffffff !important; border:1px solid #e3e3e3 !important;
-    border-radius:16px !important; min-height:43px !important;
+    border-radius:16px !important; min-height:70px !important;
     font-weight:700 !important; color:#2E5D32 !important;
     box-shadow:0 1px 3px rgba(0,0,0,.04) !important;
 }}
@@ -520,19 +520,39 @@ def import_nurseries_csv(file_bytes, replace=False, parsed=None):
     conn.commit()
     return {"nurseries": len(nurseries), "stocks": len(stocks), "warnings": warns}
 
-# ── 폴더의 농원등록_양식.csv를 앱 시작 시 자동 반영(기본 농원 데이터·항상 참조) ──
-NURSERY_CSV_PATH = os.path.join(_BASE, "농원등록_양식.csv")
+# ── 폴더의 기본 농원 CSV를 앱 시작 시 자동 반영(항상 참조) ──
+# 한글 파일명이 배포 환경(리눅스/깃 NFC·NFD)에서 인식 안 될 때 대비해 ASCII 이름도 지원
+NURSERY_CSV_CANDIDATES = ["농원등록_양식.csv", "nurseries.csv",
+                          "nursery.csv", "농원등록.csv"]
+NURSERY_CSV_PATH = os.path.join(_BASE, "농원등록_양식.csv")   # 저장(업로드 반영)용 기본 경로
+
+def _find_nursery_csv():
+    """폴더에서 기본 농원 CSV 파일을 찾는다. 한글 파일명 정규화 문제까지 방어."""
+    import glob, unicodedata
+    for name in NURSERY_CSV_CANDIDATES:                # 1) 정확한 경로 우선
+        p = os.path.join(_BASE, name)
+        if os.path.exists(p):
+            return p
+    # 2) 정규화 차이(NFC/NFD)로 못 찾으면 폴더의 모든 csv를 정규화 비교
+    want = {unicodedata.normalize("NFC", n) for n in NURSERY_CSV_CANDIDATES}
+    for p in glob.glob(os.path.join(_BASE, "*.csv")):
+        if unicodedata.normalize("NFC", os.path.basename(p)) in want:
+            return p
+    return None
 
 @st.cache_resource
 def _load_default_nursery_csv():
-    """레포 폴더에 농원등록_양식.csv가 있으면 앱 시작 시 1회 자동 반영한다.
+    """폴더에 기본 농원 CSV가 있으면 앱 시작 시 1회 자동 반영한다.
     dispatch.db는 재시작 시 초기화될 수 있지만, 레포에 커밋된 이 CSV는 유지되므로
     농원 데이터가 재시작 후에도 자동 복원된다(=항상 이 파일을 기본값으로 참조)."""
-    if not os.path.exists(NURSERY_CSV_PATH):
+    p = _find_nursery_csv()
+    if not p:
         return None
     try:
-        with open(NURSERY_CSV_PATH, "rb") as f:
-            return import_nurseries_csv(f.read(), replace=False)
+        with open(p, "rb") as f:
+            res = import_nurseries_csv(f.read(), replace=False)
+        res["path"] = os.path.basename(p)
+        return res
     except Exception as e:
         return {"error": str(e)}
 
@@ -1314,11 +1334,11 @@ def header():
     c1, c2 = st.columns([1, 1], vertical_alignment="center")  # 로고↔알림 세로 가운데
     logo = asset("Flower_land.png")
     with c1:
-        # Flower_land.png 로고 = 홈 버튼. 내용 폭에 맞춘 컴팩트 회색 카드(왼쪽 배치)
+        # Flower_land.png 로고 = 홈 버튼. 회색 카드를 꽉 채움(cover·여백 없음, 알림과 동일 높이)
         if logo:
-            if clickable_image(logo, f"logohome_{page}", aspect="300/96",
-                               fit="contain", bg="#EFF1EF", pad="8px 14px",
-                               pos="left center", height="43px", hug=True):
+            if clickable_image(logo, f"logohome_{page}", fit="cover",
+                               bg="#F5F5F5", pos="center",
+                               height="70px", hug=False):
                 go("home")
         else:
             if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
