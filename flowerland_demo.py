@@ -1071,8 +1071,8 @@ def plant_picker(recs, key):
             if ill:      # 사진 자체가 선택 버튼
                 picked = clickable_image(
                     _thumb(ill, 280), f"{key}_{i}_{rp}", aspect="3/4",
-                    fit="contain",
-                    bg="#DFF3E0" if rp == sel else "#F5F5F5", pad="6px")
+                    fit="cover",
+                    bg="#DFF3E0" if rp == sel else "#F5F5F5", pad="3px")
             else:        # 일러스트 없으면 이름 버튼 폴백
                 picked = st.button(("✅ " if rp == sel else "") + PLANT_NAMES[rp],
                                    key=f"{key}_{i}_{rp}", use_container_width=True,
@@ -1777,7 +1777,7 @@ elif page == "space":
         except TypeError:
             _grp = st.container()
         with _grp:
-            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:0; "
+            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:0 0 14px; "
                         "font-size:clamp(10.5px, 3.3vw, 15px); white-space:nowrap; "
                         "overflow:hidden; text-overflow:ellipsis;'>"
                         "🌿 다른 식물로 바꿔보기 · 식물 사진을 탭하면 아래에 올라옵니다</div>",
