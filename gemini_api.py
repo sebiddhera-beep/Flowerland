@@ -19,6 +19,7 @@ import base64
 import json
 import os
 import re
+import time
 
 import requests
 
@@ -51,6 +52,8 @@ def _parts(prompt, images):
 def _post(key, model, body):
     r = requests.post(f"{BASE}/{model}:generateContent",
                       params={"key": key},
+                      headers={"x-goog-api-key": key,
+                               "Content-Type": "application/json"},
                       json=body, timeout=TIMEOUT)
     if not r.ok:
         # HTTPError만으론 원인을 알 수 없어, API가 돌려준 실제 에러 메시지를 예외에 포함
@@ -89,22 +92,28 @@ def make_image(key, prompt, images=None, model=None):
     models = [model] if model else IMAGE_MODELS
     last_err = None
     for m in models:
-        try:
-            data = _post(key, m, body)
+        for attempt in range(3):
+            try:
+                data = _post(key, m, body)
+            except Exception as e:
+                last_err = e; emsg = str(e)
+                # 분당 한도(일시적 429)면 잠깐 대기 후 재시도.
+                # 단 무료한도 0/일일소진(billing·per day·limit: 0)은 재시도 무의미 → 제외.
+                if ("429" in emsg and "limit: 0" not in emsg
+                        and "per day" not in emsg and "billing" not in emsg
+                        and attempt < 2):
+                    time.sleep(2 * (attempt + 1)); continue
+                # 모델 없음/미지원/잘못된 요청 → 다음 후보 모델로
+                if any(t in emsg for t in ("404", "400", "not found",
+                        "not supported", "NOT_FOUND", "INVALID_ARGUMENT")):
+                    break
+                raise                      # 그 외(403·하드 429 등)는 즉시 중단
             for p in data["candidates"][0]["content"]["parts"]:
                 inline = p.get("inline_data") or p.get("inlineData")
                 if inline and inline.get("data"):
                     return base64.b64decode(inline["data"])
             last_err = RuntimeError(f"[{m}] 응답에 이미지가 없습니다: "
                                     + json.dumps(data)[:300])
-        except Exception as e:
-            last_err = e
-            emsg = str(e)
-            # 모델 없음(404)·미지원·잘못된 요청(400)이면 다음 후보 모델로 계속 시도.
-            # 그 외(403 권한, 429 할당량 초과 등)는 재시도 무의미 → 즉시 중단.
-            if any(t in emsg for t in ("404", "400", "not found", "not supported",
-                                        "NOT_FOUND", "INVALID_ARGUMENT")):
-                continue
             break
     raise last_err or RuntimeError("이미지 생성 실패")
 
