@@ -957,7 +957,7 @@ def place_stage(pid, key="stage", height=None):
     # ── 핵심: 부모 페이지에서 이 컴포넌트 iframe의 높이를 사진 비율로 고정 ──
     st.markdown(f"""<style>
     [class*="st-key-flstage_{key}"] iframe {{
-        width:100% !important; height:auto !important;
+        width:90% !important; height:auto !important; margin:0 auto;
         aspect-ratio:{_w}/{_h};
         min-height:0 !important; max-height:none !important; display:block;
     }}
