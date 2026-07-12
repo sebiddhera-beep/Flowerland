@@ -1756,16 +1756,16 @@ elif page == "space":
                             st.code(_err)
                         place_stage(pid, key="st2")  # 실패 시 수동 배치로 자동 대체
 
-        # ── 추천 식물 5종: 사진 바로 아래 · 식물 사진을 탭하면 선택 ──
-        st.markdown("<div style='font-weight:800; color:#2E7D32; margin:6px 0 2px; "
-                    "font-size:clamp(11px, 3.5vw, 16px); white-space:nowrap; "
-                    "overflow:hidden; text-overflow:ellipsis;'>"
-                    "🌿 추천 식물 5종 · 식물 사진을 탭하면 위에 올라옵니다</div>",
-                    unsafe_allow_html=True)
-        plant_picker(recs, "pick2")
+            # ── 추천 식물 5종: 사진 바로 아래 밀착 · 식물 사진을 탭하면 선택 ──
+            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:2px 0 0; "
+                        "font-size:clamp(11px, 3.5vw, 16px); white-space:nowrap; "
+                        "overflow:hidden; text-overflow:ellipsis;'>"
+                        "🌿 추천 식물 5종 · 식물 사진을 탭하면 위에 올라옵니다</div>",
+                        unsafe_allow_html=True)
+            plant_picker(recs, "pick2")
 
-        # ── 선택한 식물의 상세 안내 (AI 요약, 식물별 캐시) ──
-        plant_brief_card(ss.sp_pid)
+            # ── 선택한 식물의 상세 안내 (AI 요약, 식물별 캐시) ──
+            plant_brief_card(ss.sp_pid)
 
         st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
 
