@@ -928,8 +928,8 @@ def place_stage(pid, key="stage", height=None):
         _aspect = (_w / _h) if _h else 1.4
     except Exception:
         _aspect = 1.4
-    if height is None:                       # 사진 표시 폭을 380px로 고정 → 모든 화면에서 높이 일치
-        height = int(min(700, max(140, 380 / _aspect + 8)))
+    if height is None:                       # 사진 표시 폭 380px 고정 → 세로 긴 사진도 잘리지 않게 상한 제거
+        height = int(min(3000, max(120, 380 / _aspect + 8)))
     ill = plant_illust(pid)
     _pi = _white_to_transparent(ill) if ill else \
         draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
