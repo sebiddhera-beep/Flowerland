@@ -1418,8 +1418,20 @@ def header():
             if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
                 go("home")
     with c2:
-        # 🔔 알림 벨 — 컬럼을 채우는 넓은 흰 박스 (스크린샷과 동일)
-        with st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=True):
+        # 🔔 알림 벨 — 높이 38px(로고와 동일), 폭 10% 축소(우측 정렬)
+        st.markdown("""<style>
+        [class*="st-key-bell_wrap"] [data-testid="stPopover"] > div > button,
+        [class*="st-key-bell_wrap"] button {
+            height:38px !important; min-height:38px !important;
+            width:90% !important; margin-left:auto !important; display:block;
+            padding-top:0 !important; padding-bottom:0 !important;
+        }
+        </style>""", unsafe_allow_html=True)
+        try:
+            _bw = st.container(key="bell_wrap")
+        except TypeError:
+            _bw = st.container()
+        with _bw, st.popover(f"🔔 알림 {len(NOTICES)}", use_container_width=True):
             st.markdown("**📣 새 소식 · 예약 알림**")
             for ico, txt in NOTICES:
                 st.markdown(f"{ico} {txt}")
