@@ -29,7 +29,7 @@ from datetime import datetime, date, timedelta
 import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont
 
 import traffic_dispatch as td
 
@@ -49,10 +49,8 @@ except ImportError:
 st.set_page_config(page_title="Flower Land (플라워랜드)", page_icon="🌱",
                    layout="wide", initial_sidebar_state="collapsed")
 
-# ── 앱 콘텐츠 폭: 모바일 고정 단일 레이아웃 ──────────────────────────────
-# 모든 기기에서 이 폭 하나로만 렌더링한다(PC에서는 화면 중앙에 폰처럼 표시).
-# 추후 PC 버전을 만들 때는 아래 숫자만 키우면 됨 (예: "960px").
-APP_WIDTH = "430px"
+# ── PC/모바일 콘텐츠 최대 폭 (여기 숫자만 바꾸면 전체 폭 조절됨) ──
+PC_MAX_WIDTH = "960px"   # PC에서 콘텐츠가 중앙에 이 폭으로 정렬됨(넓게: 1100px, 좁게: 820px)
 GREEN = "#2E7D32"
 st.markdown(f"""
 <style>
@@ -66,14 +64,10 @@ st.markdown(f"""
                animation:fl-rotate 0.9s linear infinite; }}
 .fl-spin-txt {{ margin-top:14px; color:{GREEN}; font-weight:700; font-size:15px; }}
 @keyframes fl-rotate {{ to {{ transform:rotate(360deg); }} }}
-.block-container {{ max-width: {APP_WIDTH}; margin: 0 auto; padding-top: .6rem;
-                    padding-left: .7rem; padding-right: .7rem; }}
+.block-container {{ max-width: {PC_MAX_WIDTH}; margin: 0 auto; padding-top: 2.4rem; }}
 h1,h2,h3 {{ color:{GREEN}; }}
 .step {{ color:{GREEN}; font-weight:800; font-size:15px; letter-spacing:.3px; }}
 .big  {{ font-size:24px; font-weight:800; line-height:1.35; }}
-/* 한 줄 고정 + 화면 폭에 따라 글자 자동 축소 (넘치면 말줄임) */
-.fit1 {{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-.big.fit1 {{ font-size:clamp(15px, 4.6vw, 24px); }}
 .banner {{ border-radius:16px; padding:16px; min-height:185px; }}
 .banner-fun  {{ background:linear-gradient(135deg,#fff3b0,#a7e9af,#a0d8f1); }}
 .banner-util {{ background:linear-gradient(135deg,#efe6d8,#f5f0e6); }}
@@ -924,74 +918,37 @@ def composite_plant(bg_bytes, pid, x_pct, y_pct, scale_pct, label):
     d.text((x+ps/2-tw/2, y+ps+14), label, font=f, fill=(30, 60, 30))
     return out
 
-def _upright_jpeg(b):
-    """EXIF 회전을 픽셀에 직접 적용해 방향 태그 없는 JPEG로 정규화.
-    (브라우저는 EXIF를 적용해 표시하지만 PIL의 size는 회전 전 값이라
-     비율 계산이 뒤집혀 iframe 높이가 과대/과소해지는 원인 — 근본 차단)
-    과대 해상도도 1280px로 축소해 base64 전송량을 줄인다. 해시로 캐시."""
-    _h = img_hash(b)
-    if ss.get("_upr_h") == _h and ss.get("_upr_b"):
-        return ss["_upr_b"]
-    try:
-        im = ImageOps.exif_transpose(Image.open(io.BytesIO(b))).convert("RGB")
-        im.thumbnail((1280, 1280))
-        o = io.BytesIO(); im.save(o, "JPEG", quality=88)
-        ss["_upr_h"], ss["_upr_b"] = _h, o.getvalue()
-        return o.getvalue()
-    except Exception:
-        return b
-
 def place_stage(pid, key="stage", height=None):
     """공간 사진 위에 식물을 얹어, 핀치(크기)·드래그로 실시간 배치해보는 미리보기.
-    iframe 높이는 JS 보정이 아니라 부모 페이지 CSS의 aspect-ratio로 결정한다
-    → 어떤 기기/웹뷰에서도 사진 비율 그대로, 위아래 빈 공간 0."""
-    bg = _upright_jpeg(ss.sp_img)                 # EXIF 회전 정규화된 사진
-    bg_b64 = base64.b64encode(bg).decode()
+    별도 '확정' 버튼 없이 화면에서 바로 체험한다(2손가락=크기+위치, 1손가락=스크롤)."""
+    bg_b64 = base64.b64encode(ss.sp_img).decode()
+    # 사진 실제 비율로 iframe 높이 추정 → 로드 후 JS가 실제 높이에 맞춰 더 조여 빈 공간 제거
     try:
-        _w, _h = Image.open(io.BytesIO(bg)).size  # 정규화 후 = 실제 표시 방향
+        _w, _h = Image.open(io.BytesIO(ss.sp_img)).size
+        _aspect = (_w / _h) if _h else 1.4
     except Exception:
-        _w, _h = 4, 3
-    _aspect = (_w / _h) if _h else 1.4
-    if height is None:                            # CSS 미적용 시 폴백 초기값
+        _aspect = 1.4
+    if height is None:                       # 사진 표시 폭 380px 고정 → 세로 긴 사진도 잘리지 않게 상한 제거
         height = int(min(3000, max(120, 380 / _aspect + 8)))
-    # ── 핵심: 부모 페이지에서 이 컴포넌트 iframe의 높이를 사진 비율로 고정 ──
-    st.markdown(f"""<style>
-    [class*="st-key-flstage_{key}"] iframe {{
-        width:90% !important; height:auto !important; margin:0 auto;
-        aspect-ratio:{_w}/{_h};
-        min-height:0 !important; max-height:none !important; display:block;
-    }}
-    [class*="st-key-flstage_{key}"],
-    [class*="st-key-flstage_{key}"] [data-testid="stElementContainer"] {{
-        height:auto !important; min-height:0 !important;
-    }}
-    </style>""", unsafe_allow_html=True)
-    try:
-        _wrap = st.container(key=f"flstage_{key}")
-    except TypeError:                             # 구버전 Streamlit 폴백
-        _wrap = st.container()
     ill = plant_illust(pid)
     _pi = _white_to_transparent(ill) if ill else \
         draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
     _buf = io.BytesIO(); _pi.save(_buf, "PNG")
     plant_b64 = base64.b64encode(_buf.getvalue()).decode()
-    with _wrap:
-        components.html(f"""
+    components.html(f"""
     <style>html,body{{margin:0;padding:0;overflow:hidden;height:100%;}}</style>
-    <div id="{key}" style="position:relative; width:100%; margin:0 auto;
+    <div id="{key}" style="position:relative; width:100%; height:100%; max-width:380px; margin:0 auto;
          touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
          box-shadow:0 2px 10px rgba(0,0,0,.15);">
       <img src="data:image/jpeg;base64,{bg_b64}"
-           style="width:100%; height:auto; display:block; pointer-events:none;">
+           style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none;">
       <img id="{key}_p" src="data:image/png;base64,{plant_b64}"
            style="position:absolute; left:60%; top:62%; width:40%; height:auto;
                   transform:translate(-50%,-50%); cursor:grab;
                   filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));">
       <div style="position:absolute; left:8px; bottom:8px; background:rgba(46,125,50,.85);
-           color:#fff; font-size:11px; padding:2px 8px; border-radius:8px;
-           white-space:nowrap; max-width:calc(100% - 16px); overflow:hidden;
-           text-overflow:ellipsis;">
-        {PLANT_NAMES.get(pid,'')} · 두 손가락=크기·위치</div>
+           color:#fff; font-size:12px; padding:3px 9px; border-radius:8px;">
+        {PLANT_NAMES.get(pid,'')} — 두 손가락으로 크기·위치 · 한 손가락은 스크롤</div>
     </div>
     <script>
     (function(){{
@@ -1027,62 +984,33 @@ def place_stage(pid, key="stage", height=None):
           apply(); e.preventDefault(); }}
       }},{{passive:false}});
       stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
+      // ── iframe + 상위 래퍼 높이를 사진 실제 높이에 맞춰 조정(노트북=확대, 모바일=축소) ──
+      function fitFrame(){{
+        try{{
+          const fh=Math.ceil(stage.getBoundingClientRect().height);
+          if(fh>0 && window.frameElement){{
+            let el=window.frameElement;
+            for(let i=0;i<5 && el && el.style;i++){{      // iframe→래퍼 상위 몇 단계까지
+              el.style.height=fh+'px'; el.style.minHeight='0px';
+              el.style.maxHeight='none';                 // 확대가 max-height에 막히지 않게
+              el=el.parentElement;
+            }}
+          }}
+        }}catch(e){{}}
+      }}
+      const _bg=stage.querySelector('img');
+      if(_bg && _bg.complete) fitFrame(); else if(_bg) _bg.addEventListener('load',fitFrame);
+      window.addEventListener('resize',fitFrame);
+      try{{ new ResizeObserver(fitFrame).observe(stage); }}catch(e){{}}
+      [60,200,500,1000,2000].forEach(t=>setTimeout(fitFrame,t));
       apply();
     }})();
     </script>
     """, height=height)
 
-@st.cache_data(show_spinner=False)
-def _plant_brief(pid, name, _key):
-    """선택 식물의 상세 정보(특징·꽃말·물주기·빛·좋은 점·팁)를 AI로 요약(JSON).
-    식물별로 캐시되어 같은 식물은 재호출 없음. 실패 시 예외 → 폴백."""
-    prompt = (f"실내외 관상식물 '{name}'에 대해 아래 JSON 스키마로만 답하라. "
-              "각 항목은 초보자도 이해하기 쉬운 자연스러운 한국어 문장으로.\n"
-              '{"feature": "생김새·성질 특징 한 문장 (40자 내외)",\n'
-              ' "flower_lang": "꽃말 또는 상징적 의미와 유래 한 문장",\n'
-              ' "water": "물주기 요령 한 문장 (예: 겉흙이 마르면 흠뻑)",\n'
-              ' "light": "빛·놓을 자리 한 문장 (예: 밝은 간접광, 직사광 피함)",\n'
-              ' "benefit": "좋은 점 — 공기정화·습도조절·풍수 등 한 문장",\n'
-              ' "tip": "키울 때 꿀팁 또는 주의점 한 문장"}')
-    return gm.ask_json(_key, prompt)
-
-def plant_brief_card(pid):
-    """추천 식물 아래: 선택한 식물의 상세 안내 카드.
-    머리글 + 특징/꽃말/물주기/빛/좋은 점/팁을 줄 단위로 안내한다."""
-    name = PLANT_NAMES.get(pid, "")
-    info = None
-    if gemini_on():
-        try:
-            with st.spinner(f"🤖 {name} 정보 요약 중..."):
-                info = _plant_brief(pid, name, api_key)
-        except Exception:
-            info = None
-    rows = []
-    if info:
-        for emoji, label, k in (("🌿", "특징", "feature"),
-                                ("💐", "꽃말", "flower_lang"),
-                                ("💧", "물주기", "water"),
-                                ("☀️", "빛", "light"),
-                                ("✨", "좋은 점", "benefit"),
-                                ("💡", "팁", "tip")):
-            v = (info.get(k) or "").strip()
-            if v:
-                rows.append(f"{emoji} <b>{label}</b> · {v}")
-    if not rows:                             # AI 미사용/실패 → 내장 설명 폴백
-        rows = [f"🌿 {PLANT_DESC.get(pid, '초보자도 키우기 쉬운 인기 식물입니다.')}"]
-    body = "<br>".join(rows)
-    st.markdown(
-        f"<div class='acard' style='text-align:left; font-size:14px; line-height:1.85'>"
-        f"<b style='color:{GREEN}; font-size:17px'>{name}</b><br>"
-        f"<span style='color:#666'>\"이 공간의 채광·규모에 잘 맞는 추천 식물입니다.\"</span><br>"
-        f"{body}</div>",
-        unsafe_allow_html=True)
-
-
 def plant_picker(recs, key):
-    """추천 식물 타일(가로 나열). '실물 사진'을 탭하면 그 식물이 선택되어
-    (연초록 박스로 표시) 배치 스테이지에 즉시 반영된다.
-    이름은 사진 아래 라벨 — 화면 폭에 따라 글자 자동 축소(clamp)."""
+    """추천 식물 타일(가로 나열). 탭하면 선택되어 색이 진해지고 ss.sp_pid가 바뀌며,
+    사진(배치 스테이지)에 즉시 반영된다."""
     sel = ss.get("sp_pid")
     if sel not in recs:
         sel = recs[0]; ss.sp_pid = sel
@@ -1090,23 +1018,14 @@ def plant_picker(recs, key):
     for i, (col, rp) in enumerate(zip(cols, recs)):
         with col:
             ill = plant_illust(rp)
-            if ill:      # 사진 자체가 선택 버튼
-                picked = clickable_image(
-                    _thumb(ill, 280), f"{key}_{i}_{rp}", aspect="3/4",
-                    fit="contain",
-                    bg="#DFF3E0" if rp == sel else "#F5F5F5", pad="6px")
-            else:        # 일러스트 없으면 이름 버튼 폴백
-                picked = st.button(("✅ " if rp == sel else "") + PLANT_NAMES[rp],
-                                   key=f"{key}_{i}_{rp}", use_container_width=True,
-                                   type="primary" if rp == sel else "secondary")
-            _c = GREEN if rp == sel else "#444"
-            st.markdown(
-                f"<div style='text-align:center; font-weight:700; color:{_c}; "
-                f"font-size:clamp(10.5px, 2.9vw, 14px); white-space:nowrap; "
-                f"overflow:hidden; text-overflow:ellipsis; margin-top:-4px'>"
-                f"{PLANT_NAMES[rp]}</div>",
-                unsafe_allow_html=True)
-            if picked and rp != sel:
+            if ill:
+                st.image(_thumb(ill, 200), use_container_width=True)
+            else:
+                st.markdown("<div style='text-align:center;font-size:36px'>🌿</div>",
+                            unsafe_allow_html=True)
+            if st.button(("✅ " if rp == sel else "") + PLANT_NAMES[rp],
+                         key=f"{key}_{i}_{rp}", use_container_width=True,
+                         type="primary" if rp == sel else "secondary"):
                 ss.sp_pid = rp; st.rerun()
     return sel
 
@@ -1616,7 +1535,7 @@ elif page == "space":
 
     if step == 1:
         st.markdown("<div class='step'>1단계: 공간 사진 등록</div>", unsafe_allow_html=True)
-        st.markdown("<div class='big fit1'>분석할 정원이나 거실 사진을 올려주세요.</div>",
+        st.markdown("<div class='big'>분석할 정원이나 거실 사진을 올려주세요.</div>",
                     unsafe_allow_html=True)
         st.caption("(A single, best photo is recommended)")
         ss.room = st.selectbox("공간 유형",
@@ -1696,79 +1615,54 @@ elif page == "space":
         pid = ss.sp_pid
 
         # ── 가상 배치 (기존 3단계를 여기로 병합) ──
-        # ── 가상 배치 체험: 제목·선택지·안내문·사진을 틈 없이 밀착 배치 ──
-        st.markdown("""<style>
-        [class*="st-key-st2_grp"] { gap:.25rem !important; }
-        [class*="st-key-st2_grp"] [data-testid="stVerticalBlock"] { gap:.25rem !important; }
-        [class*="st-key-mode_sel"] [role="radiogroup"] {
-            flex-direction:row !important; flex-wrap:nowrap !important;
-            gap:10px !important; }
-        [class*="st-key-mode_sel"] [role="radiogroup"] label { white-space:nowrap; }
-        [class*="st-key-mode_sel"] [role="radiogroup"] label p {
-            font-size:clamp(12px, 3.4vw, 15px) !important; white-space:nowrap; }
-        </style>""", unsafe_allow_html=True)
-        try:
-            _g2 = st.container(key="st2_grp")
-        except TypeError:
-            _g2 = st.container()
-        with _g2:
-            st.markdown("<div style='font-weight:800; font-size:15px; margin:0'>"
-                        "🪴 가상 배치 체험</div>", unsafe_allow_html=True)
-            mode = st.radio("합성 방식",
-                            ["🎚️ 수동 배치", "🤖 AI 실사 합성 (Flowerland)"],
-                            horizontal=True, index=0, key="mode_sel",
-                            label_visibility="collapsed")   # '합성 방식' 라벨만 숨김
-            if mode.startswith("🎚️"):
-                st.markdown("<div style='color:#666; margin:0; "
-                            "font-size:clamp(9.5px, 2.9vw, 13px); white-space:nowrap; "
-                            "overflow:hidden; text-overflow:ellipsis;'>"
-                            "✌️ 두 손가락=크기·위치 · 한 손가락=스크롤 (PC: 드래그·휠)</div>",
-                            unsafe_allow_html=True)
-                place_stage(pid, key="st2")         # 확정 버튼 없이 실시간 배치
+        st.markdown("##### 🪴 가상 배치 체험")
+        mode = st.radio("합성 방식", ["🎚️ 수동 배치", "🤖 AI 실사 합성 (Flowerland)"],
+                        horizontal=True, index=0)   # 수동 배치가 기본
+        if mode.startswith("🎚️"):
+            st.caption("✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 "
+                       "(PC는 드래그 이동, 휠로 크기)")
+            place_stage(pid, key="st2")             # 확정 버튼 없이 실시간 배치
+        else:
+            if not gemini_on():
+                st.warning("AI 실사 합성을 쓰려면 사이드바에서 AI 키를 입력하세요.")
             else:
-                if not gemini_on():
-                    st.warning("AI 실사 합성을 쓰려면 사이드바에서 AI 키를 입력하세요.")
-                else:
-                    cache_key = (h, pid)
-                    if ss.get("comp_key") != cache_key:
-                        try:
-                            with st.spinner(f"🤖 Flowerland가 {PLANT_NAMES[pid]}을(를) "
-                                            f"{ss.room}에 합성하는 중... (10~20초)"):
-                                ss.comp_img = gm.composite_plant_ai(
-                                    api_key, ss.sp_img, PLANT_NAMES[pid], ss.room)
-                            ss.comp_key = cache_key; ss.comp_err = None
-                        except Exception as e:
-                            ss.comp_img = None; ss.comp_key = cache_key
-                            ss.comp_err = f"{type(e).__name__}: {e}"
-                    if ss.get("comp_img"):
-                        st.image(ss.comp_img, use_container_width=True,
-                                 caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Flowerland)")
-                        if st.button("🔄 다시 합성하기", use_container_width=True):
-                            ss.comp_key = None; st.rerun()
-                    elif ss.get("comp_err"):
-                        _err = ss.comp_err
-                        if "429" in _err:
-                            st.warning("무료 AI 이미지 생성 한도를 초과했어요 (429). 잠시 후 다시 "
-                                       "시도하거나, 아래 **수동 배치**를 이용해 주세요.")
-                        else:
-                            st.warning("AI 실사 합성에 실패했어요 — 아래 **수동 배치**를 사용해 주세요.")
-                        with st.expander("오류 상세 보기 (관리자용)"):
-                            st.code(_err)
-                        place_stage(pid, key="st2")  # 실패 시 수동 배치로 자동 대체
+                cache_key = (h, pid)
+                if ss.get("comp_key") != cache_key:
+                    try:
+                        with st.spinner(f"🤖 Flowerland가 {PLANT_NAMES[pid]}을(를) "
+                                        f"{ss.room}에 합성하는 중... (10~20초)"):
+                            ss.comp_img = gm.composite_plant_ai(
+                                api_key, ss.sp_img, PLANT_NAMES[pid], ss.room)
+                        ss.comp_key = cache_key; ss.comp_err = None
+                    except Exception as e:
+                        ss.comp_img = None; ss.comp_key = cache_key
+                        ss.comp_err = f"{type(e).__name__}: {e}"
+                if ss.get("comp_img"):
+                    st.image(ss.comp_img, use_container_width=True,
+                             caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Flowerland)")
+                    if st.button("🔄 다시 합성하기", use_container_width=True):
+                        ss.comp_key = None; st.rerun()
+                elif ss.get("comp_err"):
+                    _err = ss.comp_err
+                    if "429" in _err:
+                        st.warning("무료 AI 이미지 생성 한도를 초과했어요 (429). 잠시 후 다시 "
+                                   "시도하거나, 아래 **수동 배치**를 이용해 주세요.")
+                    else:
+                        st.warning("AI 실사 합성에 실패했어요 — 아래 **수동 배치**를 사용해 주세요.")
+                    with st.expander("오류 상세 보기 (관리자용)"):
+                        st.code(_err)
+                    place_stage(pid, key="st2")     # 실패 시 수동 배치로 자동 대체
 
-            # ── 추천 식물 5종: 사진 바로 아래 밀착 · 식물 사진을 탭하면 선택 ──
-            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:2px 0 0; "
-                        "font-size:clamp(11px, 3.5vw, 16px); white-space:nowrap; "
-                        "overflow:hidden; text-overflow:ellipsis;'>"
-                        "🌿 추천 식물 5종 · 식물 사진을 탭하면 위에 올라옵니다</div>",
-                        unsafe_allow_html=True)
-            plant_picker(recs, "pick2")
-
-            # ── 선택한 식물의 상세 안내 (AI 요약, 식물별 캐시) ──
-            plant_brief_card(ss.sp_pid)
-
+        # ── 사진 아래: 분석 라인(창문방향…여백) + 종합 추천 지표 (첨부 이미지 순서) ──
+        chips = " &nbsp;·&nbsp; ".join(
+            f"{e} <b>{t}</b> {s.split('<br>')[0]}" for (e, t, s) in cards)
+        st.markdown(f"<div class='acard' style='text-align:left; font-size:14px; "
+                    f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
         st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
 
+        # ── 추천 식물 5종: 사진 아래에서 탭하면 사진에 올라옵니다 ──
+        st.markdown("#### 🌿 추천 식물 5종 · 탭하면 사진에 올라옵니다")
+        plant_picker(recs, "pick2")
         if mode.startswith("🎚️"):
             _pot = ["토분", "플라스틱(화이트)", "야외용(다크)"]
             ss.pot_style = st.selectbox("🏺 화분 스타일", _pot,
@@ -1785,28 +1679,13 @@ elif page == "space":
         match = ss.get("sp_match", 95 + h % 5)
         st.markdown("<div class='step'>3단계: 나의 최적 식물 & 농원</div>",
                     unsafe_allow_html=True)
-        st.markdown(f"<div class='big fit1' style='font-size:clamp(12px, 3.5vw, 20px)'>"
-                    f"??님! 이 식물이 당신의 {ss.room}과 "
+        st.markdown(f"<div class='big'>{USER_NAME}님! 이 식물이 당신의 {ss.room}과 "
                     f"{match}% 어울립니다!</div>", unsafe_allow_html=True)
 
-        # ── 식물 선택 탭(위) → 사진(아래) 밀착 배치: 탭하면 아래 사진에 즉시 반영 ──
-        st.markdown("""<style>
-        [class*="st-key-st3_grp"] { gap:.3rem !important; }
-        [class*="st-key-st3_grp"] [data-testid="stVerticalBlock"] { gap:.3rem !important; }
-        </style>""", unsafe_allow_html=True)
-        try:
-            _grp = st.container(key="st3_grp")
-        except TypeError:
-            _grp = st.container()
-        with _grp:
-            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:0; "
-                        "font-size:clamp(10.5px, 3.3vw, 15px); white-space:nowrap; "
-                        "overflow:hidden; text-overflow:ellipsis;'>"
-                        "🌿 다른 식물로 바꿔보기 · 식물 사진을 탭하면 아래에 올라옵니다</div>",
-                        unsafe_allow_html=True)
-            plant_picker(recs, "pick4")
-            # 사진 위에 식물 배치 미리보기 (핀치=크기·위치)
-            place_stage(pid, key="st4")
+        # 사진 위에 식물 배치 미리보기 (핀치=크기·위치, 요청 8)
+        place_stage(pid, key="st4")
+        st.markdown("##### 🌿 다른 식물로 바꿔보기 · 탭하면 사진에 올라옵니다")
+        plant_picker(recs, "pick4")
 
         reason = ss.get("sp_reason") or PLANT_DESC.get(
             pid, "이 공간의 채광·규모에 최적화된 추천 식물")
@@ -1814,11 +1693,7 @@ elif page == "space":
                     f"{reason}<br>단지 평균가 / 건강 장수 수명 ⭐ 4.9</div>",
                     unsafe_allow_html=True)
 
-        st.markdown(f"<div style='font-weight:800; color:{GREEN}; margin:10px 0 4px; "
-                    f"font-size:clamp(12px, 4.1vw, 18px); white-space:nowrap; "
-                    f"overflow:hidden; text-overflow:ellipsis;'>"
-                    f"🏆 이 식물을 가장 잘 키우고 조경 자재를 보유한 농원</div>",
-                    unsafe_allow_html=True)
+        st.markdown("#### 이 식물을 가장 잘 키우고 조경 자재를 보유한 농원")
         b = best_nursery(pid, "fun02")
         if b: best_card(b, pid)
         if st.button("처음부터 다시", use_container_width=True):
