@@ -1409,8 +1409,8 @@ def header():
     with c1:
         # Flower_land.png 로고 = 홈 버튼. 실제 비율로 카드를 딱 맞춰(hug) 잘림·왜곡·여백 없음
         if logo:
-            # 로고 30% 축소(54→38px) + 안쪽 여백 최소화로 그림이 카드를 꽉 채움
-            if clickable_image(logo, f"logohome_{page}", fit="cover",
+            # 로고: 높이 38px(30% 축소) · 카드 크기는 그대로, 로고 그림만 2% 확대 (background-size 102%)
+            if clickable_image(logo, f"logohome_{page}", fit="102% 102%",
                                bg="#F5F5F5", pad="2px", pos="center",
                                height="38px", hug=True):
                 go("home")
