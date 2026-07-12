@@ -100,7 +100,7 @@ h1,h2,h3 {{ color:{GREEN}; }}
 /* ── 헤더 알림 버튼: 컬럼을 채우는 흰색 둥근 박스 (스크린샷과 동일) ── */
 [data-testid="stPopover"] button {{
     background:#ffffff !important; border:1px solid #e3e3e3 !important;
-    border-radius:16px !important; min-height:70px !important;
+    border-radius:16px !important; min-height:64px !important;
     font-weight:700 !important; color:#2E5D32 !important;
     box-shadow:0 1px 3px rgba(0,0,0,.04) !important;
 }}
@@ -613,6 +613,16 @@ def _b64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
+@st.cache_data
+def _img_ratio(path):
+    """이미지 실제 가로/세로 비율(폭÷높이). 실패 시 None."""
+    try:
+        with Image.open(path) as im:
+            w, h = im.size
+        return (w / h) if h else None
+    except Exception:
+        return None
+
 def clickable_image(path, key, aspect="351/416", fit="100% 100%", frame=True,
                     bg=None, pad=None, pos="center", height=None, hug=False):
     """이미지 전체가 버튼으로 동작. 클릭하면 True 반환 (세션 유지됨).
@@ -635,8 +645,11 @@ def clickable_image(path, key, aspect="351/416", fit="100% 100%", frame=True,
     if hug and height:      # 내용 폭으로 축소: 높이 고정 + aspect로 폭을 명시(px)해 클릭영역 정확히 일치
         try:
             _hpx = float(str(height).replace("px", "").strip())
-            _aw, _ah = (str(aspect).split("/") + ["1"])[:2]
-            _wpx = _hpx * (float(_aw) / float(_ah))
+            _ratio = _img_ratio(path)     # 실제 로고 비율(폭÷높이) → 박스를 로고에 딱 맞춤
+            if not _ratio:
+                _aw, _ah = (str(aspect).split("/") + ["1"])[:2]
+                _ratio = float(_aw) / float(_ah)
+            _wpx = _hpx * _ratio
             size_rule = (f"height: {height}; width: {_wpx:.0f}px; "
                          f"box-sizing: content-box;")
         except Exception:
@@ -923,12 +936,12 @@ def place_stage(pid, key="stage", height=None):
     _buf = io.BytesIO(); _pi.save(_buf, "PNG")
     plant_b64 = base64.b64encode(_buf.getvalue()).decode()
     components.html(f"""
-    <style>html,body{{margin:0;padding:0;overflow:hidden;height:100%;}}</style>
-    <div id="{key}" style="position:relative; width:100%; height:100%; max-width:640px; margin:0 auto;
+    <style>html,body{{margin:0;padding:0;overflow:hidden;}}</style>
+    <div id="{key}" style="position:relative; width:100%; max-width:640px; margin:0 auto;
          touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
          box-shadow:0 2px 10px rgba(0,0,0,.15);">
       <img src="data:image/jpeg;base64,{bg_b64}"
-           style="width:100%; height:100%; object-fit:cover; display:block; pointer-events:none;">
+           style="width:100%; height:auto; display:block; pointer-events:none;">
       <img id="{key}_p" src="data:image/png;base64,{plant_b64}"
            style="position:absolute; left:60%; top:62%; width:40%; height:auto;
                   transform:translate(-50%,-50%); cursor:grab;
@@ -971,7 +984,7 @@ def place_stage(pid, key="stage", height=None):
           apply(); e.preventDefault(); }}
       }},{{passive:false}});
       stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
-      // ── iframe + 상위 래퍼 높이를 사진 실제 높이에 맞춰 축소(사진 아래 빈 공간 제거) ──
+      // ── iframe + 상위 래퍼 높이를 사진 실제 높이에 맞춰 조정(노트북=확대, 모바일=축소) ──
       function fitFrame(){{
         try{{
           const fh=Math.ceil(stage.getBoundingClientRect().height);
@@ -979,6 +992,7 @@ def place_stage(pid, key="stage", height=None):
             let el=window.frameElement;
             for(let i=0;i<5 && el && el.style;i++){{      // iframe→래퍼 상위 몇 단계까지
               el.style.height=fh+'px'; el.style.minHeight='0px';
+              el.style.maxHeight='none';                 // 확대가 max-height에 막히지 않게
               el=el.parentElement;
             }}
           }}
@@ -1334,11 +1348,11 @@ def header():
     c1, c2 = st.columns([1, 1], vertical_alignment="center")  # 로고↔알림 세로 가운데
     logo = asset("Flower_land.png")
     with c1:
-        # Flower_land.png 로고 = 홈 버튼. 회색 카드를 꽉 채움(cover·여백 없음, 알림과 동일 높이)
+        # Flower_land.png 로고 = 홈 버튼. 실제 비율로 카드를 딱 맞춰(hug) 잘림·왜곡·여백 없음
         if logo:
-            if clickable_image(logo, f"logohome_{page}", fit="cover",
-                               bg="#F5F5F5", pos="center",
-                               height="70px", hug=False):
+            if clickable_image(logo, f"logohome_{page}", fit="contain",
+                               bg="#F5F5F5", pad="5px 10px", pos="center",
+                               height="54px", hug=True):
                 go("home")
         else:
             if st.button("🌱 Flower Land (홈)", key=f"logohome_{page}"):
