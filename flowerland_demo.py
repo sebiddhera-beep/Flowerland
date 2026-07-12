@@ -29,7 +29,7 @@ from datetime import datetime, date, timedelta
 import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 import traffic_dispatch as td
 
@@ -49,8 +49,10 @@ except ImportError:
 st.set_page_config(page_title="Flower Land (플라워랜드)", page_icon="🌱",
                    layout="wide", initial_sidebar_state="collapsed")
 
-# ── PC/모바일 콘텐츠 최대 폭 (여기 숫자만 바꾸면 전체 폭 조절됨) ──
-PC_MAX_WIDTH = "960px"   # PC에서 콘텐츠가 중앙에 이 폭으로 정렬됨(넓게: 1100px, 좁게: 820px)
+# ── 앱 콘텐츠 폭: 모바일 고정 단일 레이아웃 ──────────────────────────────
+# 모든 기기에서 이 폭 하나로만 렌더링한다(PC에서는 화면 중앙에 폰처럼 표시).
+# 추후 PC 버전을 만들 때는 아래 숫자만 키우면 됨 (예: "960px").
+APP_WIDTH = "430px"
 GREEN = "#2E7D32"
 st.markdown(f"""
 <style>
@@ -64,7 +66,8 @@ st.markdown(f"""
                animation:fl-rotate 0.9s linear infinite; }}
 .fl-spin-txt {{ margin-top:14px; color:{GREEN}; font-weight:700; font-size:15px; }}
 @keyframes fl-rotate {{ to {{ transform:rotate(360deg); }} }}
-.block-container {{ max-width: {PC_MAX_WIDTH}; margin: 0 auto; padding-top: 2.4rem; }}
+.block-container {{ max-width: {APP_WIDTH}; margin: 0 auto; padding-top: .6rem;
+                    padding-left: .7rem; padding-right: .7rem; }}
 h1,h2,h3 {{ color:{GREEN}; }}
 .step {{ color:{GREEN}; font-weight:800; font-size:15px; letter-spacing:.3px; }}
 .big  {{ font-size:24px; font-weight:800; line-height:1.35; }}
@@ -918,24 +921,59 @@ def composite_plant(bg_bytes, pid, x_pct, y_pct, scale_pct, label):
     d.text((x+ps/2-tw/2, y+ps+14), label, font=f, fill=(30, 60, 30))
     return out
 
+def _upright_jpeg(b):
+    """EXIF 회전을 픽셀에 직접 적용해 방향 태그 없는 JPEG로 정규화.
+    (브라우저는 EXIF를 적용해 표시하지만 PIL의 size는 회전 전 값이라
+     비율 계산이 뒤집혀 iframe 높이가 과대/과소해지는 원인 — 근본 차단)
+    과대 해상도도 1280px로 축소해 base64 전송량을 줄인다. 해시로 캐시."""
+    _h = img_hash(b)
+    if ss.get("_upr_h") == _h and ss.get("_upr_b"):
+        return ss["_upr_b"]
+    try:
+        im = ImageOps.exif_transpose(Image.open(io.BytesIO(b))).convert("RGB")
+        im.thumbnail((1280, 1280))
+        o = io.BytesIO(); im.save(o, "JPEG", quality=88)
+        ss["_upr_h"], ss["_upr_b"] = _h, o.getvalue()
+        return o.getvalue()
+    except Exception:
+        return b
+
 def place_stage(pid, key="stage", height=None):
     """공간 사진 위에 식물을 얹어, 핀치(크기)·드래그로 실시간 배치해보는 미리보기.
-    별도 '확정' 버튼 없이 화면에서 바로 체험한다(2손가락=크기+위치, 1손가락=스크롤)."""
-    bg_b64 = base64.b64encode(ss.sp_img).decode()
-    # 사진 실제 비율로 iframe 높이 추정 → 로드 후 JS가 실제 높이에 맞춰 더 조여 빈 공간 제거
+    iframe 높이는 JS 보정이 아니라 부모 페이지 CSS의 aspect-ratio로 결정한다
+    → 어떤 기기/웹뷰에서도 사진 비율 그대로, 위아래 빈 공간 0."""
+    bg = _upright_jpeg(ss.sp_img)                 # EXIF 회전 정규화된 사진
+    bg_b64 = base64.b64encode(bg).decode()
     try:
-        _w, _h = Image.open(io.BytesIO(ss.sp_img)).size
-        _aspect = (_w / _h) if _h else 1.4
+        _w, _h = Image.open(io.BytesIO(bg)).size  # 정규화 후 = 실제 표시 방향
     except Exception:
-        _aspect = 1.4
-    if height is None:      # 모바일(~380px 폭) 기준 추정치. 로드 직후 fitFrame()이
-        height = int(min(3000, max(120, 380 / _aspect + 8)))   # 실제 높이로 보정(PC=확대, 모바일=미세조정)
+        _w, _h = 4, 3
+    _aspect = (_w / _h) if _h else 1.4
+    if height is None:                            # CSS 미적용 시 폴백 초기값
+        height = int(min(3000, max(120, 380 / _aspect + 8)))
+    # ── 핵심: 부모 페이지에서 이 컴포넌트 iframe의 높이를 사진 비율로 고정 ──
+    st.markdown(f"""<style>
+    [class*="st-key-flstage_{key}"] iframe {{
+        width:100% !important; height:auto !important;
+        aspect-ratio:{_w}/{_h};
+        min-height:0 !important; max-height:none !important; display:block;
+    }}
+    [class*="st-key-flstage_{key}"],
+    [class*="st-key-flstage_{key}"] [data-testid="stElementContainer"] {{
+        height:auto !important; min-height:0 !important;
+    }}
+    </style>""", unsafe_allow_html=True)
+    try:
+        _wrap = st.container(key=f"flstage_{key}")
+    except TypeError:                             # 구버전 Streamlit 폴백
+        _wrap = st.container()
     ill = plant_illust(pid)
     _pi = _white_to_transparent(ill) if ill else \
         draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
     _buf = io.BytesIO(); _pi.save(_buf, "PNG")
     plant_b64 = base64.b64encode(_buf.getvalue()).decode()
-    components.html(f"""
+    with _wrap:
+        components.html(f"""
     <style>html,body{{margin:0;padding:0;overflow:hidden;height:100%;}}</style>
     <div id="{key}" style="position:relative; width:100%; margin:0 auto;
          touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
@@ -986,35 +1024,6 @@ def place_stage(pid, key="stage", height=None):
           apply(); e.preventDefault(); }}
       }},{{passive:false}});
       stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
-      // ── iframe 높이를 사진 실제 높이에 맞춰 조정 ──
-      // 원칙: 이 iframe '만' 담고 있는(자식 1개) 래퍼는 함께 줄이고/늘리고,
-      //       형제 콘텐츠가 있는 블록(stVerticalBlock 등)에 닿으면 멈춘다.
-      //       → 모바일: 아래 빈 공간 제거 / PC: 이후 콘텐츠 잘림 없음.
-      function fitFrame(){{
-        try{{
-          const fh=Math.ceil(stage.getBoundingClientRect().height);
-          if(fh>0 && window.frameElement){{
-            let el=window.frameElement;
-            el.setAttribute('height', fh);
-            while(el && el.style){{
-              el.style.height=fh+'px'; el.style.minHeight='0px';
-              el.style.maxHeight='none';
-              const p=el.parentElement;
-              if(!p || !p.style || p.children.length!==1) break;  // 공유 컨테이너는 손대지 않음
-              el=p;
-            }}
-          }}
-        }}catch(e){{}}
-      }}
-      // 로드 직후 3초간 매 프레임 보정(웹뷰·재렌더로 높이가 되돌아가는 것 방지)
-      (function _pump(t0){{ fitFrame();
-        if(performance.now()-t0<3000) requestAnimationFrame(()=>_pump(t0));
-      }})(performance.now());
-      const _bg=stage.querySelector('img');
-      if(_bg && _bg.complete) fitFrame(); else if(_bg) _bg.addEventListener('load',fitFrame);
-      window.addEventListener('resize',fitFrame);
-      try{{ new ResizeObserver(fitFrame).observe(stage); }}catch(e){{}}
-      [60,200,500,1000,2000].forEach(t=>setTimeout(fitFrame,t));
       apply();
     }})();
     </script>
