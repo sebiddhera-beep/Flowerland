@@ -49,9 +49,17 @@ def _parts(prompt, images):
     return parts
 
 
+def _clean_key(key):
+    """붙여넣기/Secrets 저장 과정에서 섞인 공백·줄바꿈·따옴표를 제거.
+    (401 'Expected OAuth 2 access token' 오류의 대부분이 이 원인)"""
+    return (key or "").strip().strip('"').strip("'").strip()
+
+
 def _post(key, model, body):
+    key = _clean_key(key)
+    # 쿼리파라미터(?key=) 대신 구글 권장 방식인 x-goog-api-key 헤더로 인증
     r = requests.post(f"{BASE}/{model}:generateContent",
-                      params={"key": key},
+                      headers={"x-goog-api-key": key},
                       json=body, timeout=TIMEOUT)
     if not r.ok:
         # HTTPError만으론 원인을 알 수 없어, API가 돌려준 실제 에러 메시지를 예외에 포함
@@ -59,6 +67,10 @@ def _post(key, model, body):
             msg = r.json().get("error", {}).get("message", "")[:400]
         except Exception:
             msg = r.text[:400]
+        if r.status_code in (401, 403):
+            msg += (" ← API 키가 비었거나 잘못되었습니다. aistudio.google.com에서 "
+                    "발급한 'AIza'로 시작하는 키인지, 앞뒤 공백·따옴표 없이 "
+                    "입력했는지 확인하세요.")
         raise RuntimeError(f"[{model}] {r.status_code} {r.reason}: {msg}")
     return r.json()
 

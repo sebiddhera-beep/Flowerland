@@ -928,8 +928,8 @@ def place_stage(pid, key="stage", height=None):
         _aspect = (_w / _h) if _h else 1.4
     except Exception:
         _aspect = 1.4
-    if height is None:                       # 사진 표시 폭 380px 고정 → 세로 긴 사진도 잘리지 않게 상한 제거
-        height = int(min(3000, max(120, 380 / _aspect + 8)))
+    if height is None:      # 초기 추정치일 뿐, 로드 직후 fitFrame()이 실제 높이로 보정한다
+        height = int(min(3000, max(120, 700 / _aspect + 8)))
     ill = plant_illust(pid)
     _pi = _white_to_transparent(ill) if ill else \
         draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
@@ -937,7 +937,7 @@ def place_stage(pid, key="stage", height=None):
     plant_b64 = base64.b64encode(_buf.getvalue()).decode()
     components.html(f"""
     <style>html,body{{margin:0;padding:0;overflow:hidden;height:100%;}}</style>
-    <div id="{key}" style="position:relative; width:100%; max-width:380px; margin:0 auto;
+    <div id="{key}" style="position:relative; width:100%; margin:0 auto;
          touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
          box-shadow:0 2px 10px rgba(0,0,0,.15);">
       <img src="data:image/jpeg;base64,{bg_b64}"
