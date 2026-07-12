@@ -936,12 +936,12 @@ def place_stage(pid, key="stage", height=None):
     _buf = io.BytesIO(); _pi.save(_buf, "PNG")
     plant_b64 = base64.b64encode(_buf.getvalue()).decode()
     components.html(f"""
-    <style>html,body{{margin:0;padding:0;overflow:hidden;}}</style>
-    <div id="{key}" style="position:relative; width:100%; max-width:380px; margin:0 auto;
+    <style>html,body{{margin:0;padding:0;overflow:hidden;height:100%;}}</style>
+    <div id="{key}" style="position:relative; width:100%; height:100%; max-width:380px; margin:0 auto;
          touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
          box-shadow:0 2px 10px rgba(0,0,0,.15);">
       <img src="data:image/jpeg;base64,{bg_b64}"
-           style="width:100%; height:auto; display:block; pointer-events:none;">
+           style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none;">
       <img id="{key}_p" src="data:image/png;base64,{plant_b64}"
            style="position:absolute; left:60%; top:62%; width:40%; height:auto;
                   transform:translate(-50%,-50%); cursor:grab;
