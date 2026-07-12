@@ -1034,16 +1034,21 @@ def place_stage(pid, key="stage", height=None):
 
 @st.cache_data(show_spinner=False)
 def _plant_brief(pid, name, _key):
-    """선택 식물의 특징·꽃말·좋은 점을 AI로 요약(JSON). 식물별로 캐시되어
-    같은 식물은 재호출 없음. 실패 시 예외 → 호출부에서 PLANT_DESC 폴백."""
-    prompt = (f"실내외 관상식물 '{name}'에 대해 아래 JSON 스키마로만 답하라.\n"
-              '{"feature": "생김새·성질 특징 한 문장 (25자 내외)",\n'
-              ' "flower_lang": "꽃말 (없으면 상징적 의미, 10자 내외)",\n'
-              ' "benefit": "좋은 점 — 공기정화·관리 난이도·풍수 등 한 문장 (25자 내외)"}')
+    """선택 식물의 상세 정보(특징·꽃말·물주기·빛·좋은 점·팁)를 AI로 요약(JSON).
+    식물별로 캐시되어 같은 식물은 재호출 없음. 실패 시 예외 → 폴백."""
+    prompt = (f"실내외 관상식물 '{name}'에 대해 아래 JSON 스키마로만 답하라. "
+              "각 항목은 초보자도 이해하기 쉬운 자연스러운 한국어 문장으로.\n"
+              '{"feature": "생김새·성질 특징 한 문장 (40자 내외)",\n'
+              ' "flower_lang": "꽃말 또는 상징적 의미와 유래 한 문장",\n'
+              ' "water": "물주기 요령 한 문장 (예: 겉흙이 마르면 흠뻑)",\n'
+              ' "light": "빛·놓을 자리 한 문장 (예: 밝은 간접광, 직사광 피함)",\n'
+              ' "benefit": "좋은 점 — 공기정화·습도조절·풍수 등 한 문장",\n'
+              ' "tip": "키울 때 꿀팁 또는 주의점 한 문장"}')
     return gm.ask_json(_key, prompt)
 
 def plant_brief_card(pid):
-    """추천 식물 아래: 선택한 식물의 특징/꽃말/좋은 점 요약 카드."""
+    """추천 식물 아래: 선택한 식물의 상세 안내 카드.
+    머리글 + 특징/꽃말/물주기/빛/좋은 점/팁을 줄 단위로 안내한다."""
     name = PLANT_NAMES.get(pid, "")
     info = None
     if gemini_on():
@@ -1052,15 +1057,26 @@ def plant_brief_card(pid):
                 info = _plant_brief(pid, name, api_key)
         except Exception:
             info = None
+    rows = []
     if info:
-        body = (f"🌿 <b>특징</b> {info.get('feature','')} &nbsp;·&nbsp; "
-                f"💐 <b>꽃말</b> {info.get('flower_lang','')} &nbsp;·&nbsp; "
-                f"✨ <b>좋은 점</b> {info.get('benefit','')}")
-    else:                                    # AI 미사용/실패 → 내장 설명 폴백
-        body = f"🌿 {PLANT_DESC.get(pid, '이 공간의 채광·규모에 잘 맞는 추천 식물입니다.')}"
-    st.markdown(f"<div class='acard' style='text-align:left; font-size:14px; "
-                f"line-height:1.9'><b style='color:{GREEN}'>{name}</b><br>{body}</div>",
-                unsafe_allow_html=True)
+        for emoji, label, k in (("🌿", "특징", "feature"),
+                                ("💐", "꽃말", "flower_lang"),
+                                ("💧", "물주기", "water"),
+                                ("☀️", "빛", "light"),
+                                ("✨", "좋은 점", "benefit"),
+                                ("💡", "팁", "tip")):
+            v = (info.get(k) or "").strip()
+            if v:
+                rows.append(f"{emoji} <b>{label}</b> · {v}")
+    if not rows:                             # AI 미사용/실패 → 내장 설명 폴백
+        rows = [f"🌿 {PLANT_DESC.get(pid, '초보자도 키우기 쉬운 인기 식물입니다.')}"]
+    body = "<br>".join(rows)
+    st.markdown(
+        f"<div class='acard' style='text-align:left; font-size:14px; line-height:1.85'>"
+        f"<b style='color:{GREEN}; font-size:17px'>{name}</b><br>"
+        f"<span style='color:#666'>\"이 공간의 채광·규모에 잘 맞는 추천 식물입니다.\"</span><br>"
+        f"{body}</div>",
+        unsafe_allow_html=True)
 
 
 def plant_picker(recs, key):
@@ -1086,7 +1102,7 @@ def plant_picker(recs, key):
             _c = GREEN if rp == sel else "#444"
             st.markdown(
                 f"<div style='text-align:center; font-weight:700; color:{_c}; "
-                f"font-size:clamp(10px, 2.9vw, 14px); white-space:nowrap; "
+                f"font-size:clamp(8.5px, 2.2vw, 13px); white-space:nowrap; "
                 f"overflow:hidden; text-overflow:ellipsis; margin-top:-4px'>"
                 f"{'✅ ' if rp == sel else ''}{PLANT_NAMES[rp]}</div>",
                 unsafe_allow_html=True)
@@ -1664,82 +1680,89 @@ elif page == "space":
             recs = (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
             ss.sp_match = 95 + h % 5
             ss.sp_reason = ""
-        # ── 추천 식물 3종 준비 + 배치할 식물 확정 ──
+        # ── 추천 식물 5종 준비 + 배치할 식물 확정 ──
         # 중복 PID 제거(순서 유지) → plant_picker 버튼 키 충돌 방지
         _seen = set(); recs = [p for p in recs if not (p in _seen or _seen.add(p))]
         _fb_all = (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
-        for p in _fb_all:                        # 3종 미만이면 기본 추천으로 보충
-            if len(recs) >= 3:
+        for p in _fb_all:                        # 5종 미만이면 기본 추천으로 보충
+            if len(recs) >= 5:
                 break
             if p not in _seen:
                 recs.append(p); _seen.add(p)
-        recs = recs[:3] or _fb_all[:3]
+        recs = recs[:5] or _fb_all[:5]
         ss.sp_recs = recs
         if ss.get("sp_pid") not in recs:
             ss.sp_pid = recs[0]
         pid = ss.sp_pid
 
         # ── 가상 배치 (기존 3단계를 여기로 병합) ──
-        st.markdown("##### 🪴 가상 배치 체험")
-        # 선택지 한 줄 고정 + 화면 폭에 따라 글자 자동 축소 (라벨은 숨김)
+        # ── 가상 배치 체험: 제목·선택지·안내문·사진을 틈 없이 밀착 배치 ──
         st.markdown("""<style>
+        [class*="st-key-st2_grp"] { gap:.25rem !important; }
+        [class*="st-key-st2_grp"] [data-testid="stVerticalBlock"] { gap:.25rem !important; }
         [class*="st-key-mode_sel"] [role="radiogroup"] {
             flex-direction:row !important; flex-wrap:nowrap !important;
-            gap:14px !important; }
+            gap:10px !important; }
         [class*="st-key-mode_sel"] [role="radiogroup"] label { white-space:nowrap; }
         [class*="st-key-mode_sel"] [role="radiogroup"] label p {
-            font-size:clamp(11px, 3.6vw, 15px) !important; white-space:nowrap; }
+            font-size:clamp(9.5px, 3vw, 14px) !important; white-space:nowrap; }
         </style>""", unsafe_allow_html=True)
-        mode = st.radio("합성 방식", ["🎚️ 수동 배치", "🤖 AI 실사 합성"],
-                        horizontal=True, index=0, key="mode_sel",
-                        label_visibility="collapsed")   # 라벨 표시 제거
-        if mode.startswith("🎚️"):
-            st.caption("✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 "
-                       "(PC는 드래그 이동, 휠로 크기)")
-            place_stage(pid, key="st2")             # 확정 버튼 없이 실시간 배치
-        else:
-            if not gemini_on():
-                st.warning("AI 실사 합성을 쓰려면 사이드바에서 AI 키를 입력하세요.")
+        try:
+            _g2 = st.container(key="st2_grp")
+        except TypeError:
+            _g2 = st.container()
+        with _g2:
+            st.markdown("<div style='font-weight:800; font-size:15px; margin:0'>"
+                        "🪴 가상 배치 체험</div>", unsafe_allow_html=True)
+            mode = st.radio("합성 방식",
+                            ["🎚️ 수동 배치", "🤖 AI 실사 합성 (Flowerland)"],
+                            horizontal=True, index=0, key="mode_sel",
+                            label_visibility="collapsed")   # '합성 방식' 라벨만 숨김
+            if mode.startswith("🎚️"):
+                st.markdown("<div style='color:#666; margin:0; "
+                            "font-size:clamp(9.5px, 2.9vw, 13px); white-space:nowrap; "
+                            "overflow:hidden; text-overflow:ellipsis;'>"
+                            "✌️ 두 손가락=크기·위치 · 한 손가락=스크롤 (PC: 드래그·휠)</div>",
+                            unsafe_allow_html=True)
+                place_stage(pid, key="st2")         # 확정 버튼 없이 실시간 배치
             else:
-                cache_key = (h, pid)
-                if ss.get("comp_key") != cache_key:
-                    try:
-                        with st.spinner(f"🤖 Flowerland가 {PLANT_NAMES[pid]}을(를) "
-                                        f"{ss.room}에 합성하는 중... (10~20초)"):
-                            ss.comp_img = gm.composite_plant_ai(
-                                api_key, ss.sp_img, PLANT_NAMES[pid], ss.room)
-                        ss.comp_key = cache_key; ss.comp_err = None
-                    except Exception as e:
-                        ss.comp_img = None; ss.comp_key = cache_key
-                        ss.comp_err = f"{type(e).__name__}: {e}"
-                if ss.get("comp_img"):
-                    st.image(ss.comp_img, use_container_width=True,
-                             caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Flowerland)")
-                    if st.button("🔄 다시 합성하기", use_container_width=True):
-                        ss.comp_key = None; st.rerun()
-                elif ss.get("comp_err"):
-                    _err = ss.comp_err
-                    if "429" in _err:
-                        st.warning("무료 AI 이미지 생성 한도를 초과했어요 (429). 잠시 후 다시 "
-                                   "시도하거나, 아래 **수동 배치**를 이용해 주세요.")
-                    else:
-                        st.warning("AI 실사 합성에 실패했어요 — 아래 **수동 배치**를 사용해 주세요.")
-                    with st.expander("오류 상세 보기 (관리자용)"):
-                        st.code(_err)
-                    place_stage(pid, key="st2")     # 실패 시 수동 배치로 자동 대체
+                if not gemini_on():
+                    st.warning("AI 실사 합성을 쓰려면 사이드바에서 AI 키를 입력하세요.")
+                else:
+                    cache_key = (h, pid)
+                    if ss.get("comp_key") != cache_key:
+                        try:
+                            with st.spinner(f"🤖 Flowerland가 {PLANT_NAMES[pid]}을(를) "
+                                            f"{ss.room}에 합성하는 중... (10~20초)"):
+                                ss.comp_img = gm.composite_plant_ai(
+                                    api_key, ss.sp_img, PLANT_NAMES[pid], ss.room)
+                            ss.comp_key = cache_key; ss.comp_err = None
+                        except Exception as e:
+                            ss.comp_img = None; ss.comp_key = cache_key
+                            ss.comp_err = f"{type(e).__name__}: {e}"
+                    if ss.get("comp_img"):
+                        st.image(ss.comp_img, use_container_width=True,
+                                 caption=f"{PLANT_NAMES[pid]} 실사 합성 결과 (Flowerland)")
+                        if st.button("🔄 다시 합성하기", use_container_width=True):
+                            ss.comp_key = None; st.rerun()
+                    elif ss.get("comp_err"):
+                        _err = ss.comp_err
+                        if "429" in _err:
+                            st.warning("무료 AI 이미지 생성 한도를 초과했어요 (429). 잠시 후 다시 "
+                                       "시도하거나, 아래 **수동 배치**를 이용해 주세요.")
+                        else:
+                            st.warning("AI 실사 합성에 실패했어요 — 아래 **수동 배치**를 사용해 주세요.")
+                        with st.expander("오류 상세 보기 (관리자용)"):
+                            st.code(_err)
+                        place_stage(pid, key="st2")  # 실패 시 수동 배치로 자동 대체
 
-        # ── 추천 식물 3종: 사진 바로 아래 · 식물 사진을 탭하면 선택 ──
-        st.markdown("#### 🌿 추천 식물 3종 · 식물 사진을 탭하면 위에 올라옵니다")
+        # ── 추천 식물 5종: 사진 바로 아래 · 식물 사진을 탭하면 선택 ──
+        st.markdown("#### 🌿 추천 식물 5종 · 식물 사진을 탭하면 위에 올라옵니다")
         plant_picker(recs, "pick2")
 
-        # ── 선택한 식물의 특징·꽃말·좋은 점 (AI 요약, 식물별 캐시) ──
+        # ── 선택한 식물의 상세 안내 (AI 요약, 식물별 캐시) ──
         plant_brief_card(ss.sp_pid)
 
-        # ── 분석 라인(창문방향…여백) + 종합 추천 지표 ──
-        chips = " &nbsp;·&nbsp; ".join(
-            f"{e} <b>{t}</b> {s.split('<br>')[0]}" for (e, t, s) in cards)
-        st.markdown(f"<div class='acard' style='text-align:left; font-size:14px; "
-                    f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
         st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
 
         if mode.startswith("🎚️"):
