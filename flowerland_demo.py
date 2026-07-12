@@ -49,8 +49,10 @@ except ImportError:
 st.set_page_config(page_title="Flower Land (플라워랜드)", page_icon="🌱",
                    layout="wide", initial_sidebar_state="collapsed")
 
-# ── PC/모바일 콘텐츠 최대 폭 (여기 숫자만 바꾸면 전체 폭 조절됨) ──
-PC_MAX_WIDTH = "960px"   # PC에서 콘텐츠가 중앙에 이 폭으로 정렬됨(넓게: 1100px, 좁게: 820px)
+# ── 앱 콘텐츠 폭: 모바일 고정 단일 레이아웃 ──────────────────────────────
+# 모든 기기에서 이 폭 하나로만 렌더링(PC에서는 화면 중앙에 폰처럼 표시).
+# 추후 PC 버전을 만들 때는 아래 숫자만 키우면 됨 (예: "960px").
+PC_MAX_WIDTH = "430px"
 GREEN = "#2E7D32"
 st.markdown(f"""
 <style>
@@ -152,16 +154,13 @@ h1,h2,h3 {{ color:{GREEN}; }}
     transition: all .15s;
 }}
 
-/* ── 반응형 컬럼 ──────────────────────────────────────────────
-   PC(기본)에서는 컬럼이 넓은 화면에 정상 비율로 배치되고,
-   모바일(≤640px)에서만 배너 2열·아이콘 4열·TOP5 5열을
-   목업처럼 가로로 강제한다(아래 @media 블록 참조). */
+/* ── 단일 레이아웃 컬럼 규칙 ──────────────────────────────────
+   앱이 430px 고정이므로 아래 모바일 스타일을 모든 기기에 항상 적용. */
 [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
     min-width: 0 !important;
     flex: 1 1 0 !important;
 }}
-@media (max-width: 640px) {{
-    .block-container {{ padding-left: .7rem; padding-right: .7rem; padding-top: .6rem; }}
+.block-container {{ padding-left: .7rem; padding-right: .7rem; padding-top: .6rem; }}
     /* 좁은 화면: 컬럼을 세로로 쌓지 말고 목업처럼 가로 유지(넘치면 스와이프) */
     [data-testid="stHorizontalBlock"] {{
         flex-wrap: nowrap !important;
@@ -184,7 +183,6 @@ h1,h2,h3 {{ color:{GREEN}; }}
     .stButton button {{ padding: .45rem .5rem; font-size: 14px; }}
     h3 {{ font-size: 1.05rem !important; }}
     h4 {{ font-size: .95rem !important; }}
-}}
 </style>""", unsafe_allow_html=True)
 
 USER_NAME = "정종섭"
@@ -706,6 +704,22 @@ def _thumb(path, max_px=480):
     except Exception:
         return path
 
+def _upright_jpeg(raw_bytes, max_px=1280):
+    """휴대폰 JPEG의 EXIF 회전을 픽셀에 즉시 적용해 정규화 + 축소.
+    이후 어디서든 Image.size가 화면에 보이는 방향과 일치 →
+    iframe 높이 계산이 틀릴 여지가 없어진다. (카톡 로딩도 빨라짐)"""
+    try:
+        from PIL import ImageOps
+        im = Image.open(io.BytesIO(raw_bytes))
+        im = ImageOps.exif_transpose(im)
+        im = im.convert("RGB")
+        im.thumbnail((max_px, max_px))
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=88)
+        return buf.getvalue()
+    except Exception:
+        return raw_bytes
+
 def camera_capture(key, front_default=True):
     """촬영 버튼 옆 전환 아이콘(🔄) 하나로 전·후면을 오가는 카메라.
     전·후면 모두 동일한 3:4 프레임 크기. 촬영 결과는 BytesIO(JPEG) 반환
@@ -922,14 +936,17 @@ def place_stage(pid, key="stage", height=None):
     """공간 사진 위에 식물을 얹어, 핀치(크기)·드래그로 실시간 배치해보는 미리보기.
     별도 '확정' 버튼 없이 화면에서 바로 체험한다(2손가락=크기+위치, 1손가락=스크롤)."""
     bg_b64 = base64.b64encode(ss.sp_img).decode()
-    # 사진 실제 비율로 iframe 높이 추정 → 로드 후 JS가 실제 높이에 맞춰 더 조여 빈 공간 제거
+    # ss.sp_img는 입수 시 _upright_jpeg()로 EXIF 정규화됨 → Image.size가
+    # 화면에 보이는 방향과 항상 일치. 앱 폭이 430px 고정이므로 스테이지
+    # 표시 폭은 380px로 결정적 → 높이도 순수 계산으로 정확(JS 보정 불필요).
     try:
         _w, _h = Image.open(io.BytesIO(ss.sp_img)).size
         _aspect = (_w / _h) if _h else 1.4
     except Exception:
-        _aspect = 1.4
-    if height is None:                       # 사진 표시 폭 380px 고정 → 세로 긴 사진도 잘리지 않게 상한 제거
-        height = int(min(3000, max(120, 380 / _aspect + 8)))
+        _w, _h, _aspect = 4, 3, 4/3
+    _stage_w = 380
+    if height is None:
+        height = int(round(_stage_w / _aspect))
     ill = plant_illust(pid)
     _pi = _white_to_transparent(ill) if ill else \
         draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
@@ -937,11 +954,12 @@ def place_stage(pid, key="stage", height=None):
     plant_b64 = base64.b64encode(_buf.getvalue()).decode()
     components.html(f"""
     <style>html,body{{margin:0;padding:0;overflow:hidden;height:100%;}}</style>
-    <div id="{key}" style="position:relative; width:100%; height:100%; max-width:380px; margin:0 auto;
+    <div id="{key}" style="position:relative; width:100%; max-width:{_stage_w}px; margin:0 auto;
+         aspect-ratio:{_w}/{_h}; height:auto;
          touch-action:pan-y; user-select:none; border-radius:12px; overflow:hidden;
          box-shadow:0 2px 10px rgba(0,0,0,.15);">
       <img src="data:image/jpeg;base64,{bg_b64}"
-           style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none;">
+           style="width:100%; height:100%; object-fit:cover; display:block; pointer-events:none;">
       <img id="{key}_p" src="data:image/png;base64,{plant_b64}"
            style="position:absolute; left:60%; top:62%; width:40%; height:auto;
                   transform:translate(-50%,-50%); cursor:grab;
@@ -984,25 +1002,7 @@ def place_stage(pid, key="stage", height=None):
           apply(); e.preventDefault(); }}
       }},{{passive:false}});
       stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
-      // ── iframe + 상위 래퍼 높이를 사진 실제 높이에 맞춰 조정(노트북=확대, 모바일=축소) ──
-      function fitFrame(){{
-        try{{
-          const fh=Math.ceil(stage.getBoundingClientRect().height);
-          if(fh>0 && window.frameElement){{
-            let el=window.frameElement;
-            for(let i=0;i<5 && el && el.style;i++){{      // iframe→래퍼 상위 몇 단계까지
-              el.style.height=fh+'px'; el.style.minHeight='0px';
-              el.style.maxHeight='none';                 // 확대가 max-height에 막히지 않게
-              el=el.parentElement;
-            }}
-          }}
-        }}catch(e){{}}
-      }}
-      const _bg=stage.querySelector('img');
-      if(_bg && _bg.complete) fitFrame(); else if(_bg) _bg.addEventListener('load',fitFrame);
-      window.addEventListener('resize',fitFrame);
-      try{{ new ResizeObserver(fitFrame).observe(stage); }}catch(e){{}}
-      [60,200,500,1000,2000].forEach(t=>setTimeout(fitFrame,t));
+      // 높이 보정 JS 없음 — iframe 높이는 서버에서 사진 비율로 정확히 계산됨.
       apply();
     }})();
     </script>
@@ -1502,7 +1502,7 @@ elif page == "face":
             "text-overflow:ellipsis;'>💡 팁: 얼굴이 잘 보이도록 찍으면 더 정확해요!</div>",
             unsafe_allow_html=True)
         if up and st.button("다음", type="primary", use_container_width=True):
-            ss.face_img = up.getvalue()
+            ss.face_img = _upright_jpeg(up.getvalue())
             run_face_analysis()          # ◀ 분석 즉시 실행
             ss.face_step = 3             # ◀ 2단계 건너뛰고 바로 3단계 카드 출력
             st.rerun()
@@ -1547,7 +1547,7 @@ elif page == "space":
         up = cam or fil
         st.info("팁: 하늘(창문)과 바닥면이 잘 보이도록 찍으면 더 정확해요!")
         if up and st.button("다음", type="primary", use_container_width=True):
-            ss.sp_img = up.getvalue(); ss.space_step = 2; st.rerun()
+            ss.sp_img = _upright_jpeg(up.getvalue()); ss.space_step = 2; st.rerun()
 
     elif step == 2:
         h = img_hash(ss.sp_img)
@@ -2229,7 +2229,7 @@ elif page == "diag":
     with t2: fil = st.file_uploader("시든 식물 사진", type=["jpg", "jpeg", "png"])
     up = cam or fil
     if up and st.button("🩺 진단하기", type="primary", use_container_width=True):
-        b = up.getvalue(); st.image(b, width=230)
+        b = _upright_jpeg(up.getvalue()); st.image(b, width=230)
         ai = None
         if gemini_on():
             try:
