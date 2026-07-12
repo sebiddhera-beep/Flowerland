@@ -1609,9 +1609,14 @@ elif page == "space":
                     if st.button("🔄 다시 합성하기", use_container_width=True):
                         ss.comp_key = None; st.rerun()
                 elif ss.get("comp_err"):
-                    st.warning("AI 실사 합성에 실패했어요 — 아래 **수동 배치**를 사용해 주세요.")
+                    _err = ss.comp_err
+                    if "429" in _err:
+                        st.warning("무료 AI 이미지 생성 한도를 초과했어요 (429). 잠시 후 다시 "
+                                   "시도하거나, 아래 **수동 배치**를 이용해 주세요.")
+                    else:
+                        st.warning("AI 실사 합성에 실패했어요 — 아래 **수동 배치**를 사용해 주세요.")
                     with st.expander("오류 상세 보기 (관리자용)"):
-                        st.code(ss.comp_err)
+                        st.code(_err)
                     place_stage(pid, key="st2")     # 실패 시 수동 배치로 자동 대체
 
         # ── 사진 아래: 분석 라인(창문방향…여백) + 종합 추천 지표 (첨부 이미지 순서) ──
