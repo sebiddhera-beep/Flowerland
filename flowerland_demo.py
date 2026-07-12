@@ -71,6 +71,9 @@ st.markdown(f"""
 h1,h2,h3 {{ color:{GREEN}; }}
 .step {{ color:{GREEN}; font-weight:800; font-size:15px; letter-spacing:.3px; }}
 .big  {{ font-size:24px; font-weight:800; line-height:1.35; }}
+/* 한 줄 고정 + 화면 폭에 따라 글자 자동 축소 (넘치면 말줄임) */
+.fit1 {{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.big.fit1 {{ font-size:clamp(15px, 4.6vw, 24px); }}
 .banner {{ border-radius:16px; padding:16px; min-height:185px; }}
 .banner-fun  {{ background:linear-gradient(135deg,#fff3b0,#a7e9af,#a0d8f1); }}
 .banner-util {{ background:linear-gradient(135deg,#efe6d8,#f5f0e6); }}
@@ -1029,9 +1032,41 @@ def place_stage(pid, key="stage", height=None):
     </script>
     """, height=height)
 
+@st.cache_data(show_spinner=False)
+def _plant_brief(pid, name, _key):
+    """선택 식물의 특징·꽃말·좋은 점을 AI로 요약(JSON). 식물별로 캐시되어
+    같은 식물은 재호출 없음. 실패 시 예외 → 호출부에서 PLANT_DESC 폴백."""
+    prompt = (f"실내외 관상식물 '{name}'에 대해 아래 JSON 스키마로만 답하라.\n"
+              '{"feature": "생김새·성질 특징 한 문장 (25자 내외)",\n'
+              ' "flower_lang": "꽃말 (없으면 상징적 의미, 10자 내외)",\n'
+              ' "benefit": "좋은 점 — 공기정화·관리 난이도·풍수 등 한 문장 (25자 내외)"}')
+    return gm.ask_json(_key, prompt)
+
+def plant_brief_card(pid):
+    """추천 식물 아래: 선택한 식물의 특징/꽃말/좋은 점 요약 카드."""
+    name = PLANT_NAMES.get(pid, "")
+    info = None
+    if gemini_on():
+        try:
+            with st.spinner(f"🤖 {name} 정보 요약 중..."):
+                info = _plant_brief(pid, name, api_key)
+        except Exception:
+            info = None
+    if info:
+        body = (f"🌿 <b>특징</b> {info.get('feature','')} &nbsp;·&nbsp; "
+                f"💐 <b>꽃말</b> {info.get('flower_lang','')} &nbsp;·&nbsp; "
+                f"✨ <b>좋은 점</b> {info.get('benefit','')}")
+    else:                                    # AI 미사용/실패 → 내장 설명 폴백
+        body = f"🌿 {PLANT_DESC.get(pid, '이 공간의 채광·규모에 잘 맞는 추천 식물입니다.')}"
+    st.markdown(f"<div class='acard' style='text-align:left; font-size:14px; "
+                f"line-height:1.9'><b style='color:{GREEN}'>{name}</b><br>{body}</div>",
+                unsafe_allow_html=True)
+
+
 def plant_picker(recs, key):
-    """추천 식물 타일(가로 나열). 탭하면 선택되어 색이 진해지고 ss.sp_pid가 바뀌며,
-    사진(배치 스테이지)에 즉시 반영된다."""
+    """추천 식물 타일(가로 나열). '실물 사진'을 탭하면 그 식물이 선택되어
+    (연초록 박스로 표시) 배치 스테이지에 즉시 반영된다.
+    이름은 사진 아래 라벨 — 화면 폭에 따라 글자 자동 축소(clamp)."""
     sel = ss.get("sp_pid")
     if sel not in recs:
         sel = recs[0]; ss.sp_pid = sel
@@ -1039,14 +1074,23 @@ def plant_picker(recs, key):
     for i, (col, rp) in enumerate(zip(cols, recs)):
         with col:
             ill = plant_illust(rp)
-            if ill:
-                st.image(_thumb(ill, 200), use_container_width=True)
-            else:
-                st.markdown("<div style='text-align:center;font-size:36px'>🌿</div>",
-                            unsafe_allow_html=True)
-            if st.button(("✅ " if rp == sel else "") + PLANT_NAMES[rp],
-                         key=f"{key}_{i}_{rp}", use_container_width=True,
-                         type="primary" if rp == sel else "secondary"):
+            if ill:      # 사진 자체가 선택 버튼
+                picked = clickable_image(
+                    _thumb(ill, 240), f"{key}_{i}_{rp}", aspect="1/1",
+                    fit="contain",
+                    bg="#DFF3E0" if rp == sel else "#F5F5F5", pad="6px")
+            else:        # 일러스트 없으면 이름 버튼 폴백
+                picked = st.button(("✅ " if rp == sel else "") + PLANT_NAMES[rp],
+                                   key=f"{key}_{i}_{rp}", use_container_width=True,
+                                   type="primary" if rp == sel else "secondary")
+            _c = GREEN if rp == sel else "#444"
+            st.markdown(
+                f"<div style='text-align:center; font-weight:700; color:{_c}; "
+                f"font-size:clamp(10px, 2.9vw, 14px); white-space:nowrap; "
+                f"overflow:hidden; text-overflow:ellipsis; margin-top:-4px'>"
+                f"{'✅ ' if rp == sel else ''}{PLANT_NAMES[rp]}</div>",
+                unsafe_allow_html=True)
+            if picked and rp != sel:
                 ss.sp_pid = rp; st.rerun()
     return sel
 
@@ -1556,7 +1600,7 @@ elif page == "space":
 
     if step == 1:
         st.markdown("<div class='step'>1단계: 공간 사진 등록</div>", unsafe_allow_html=True)
-        st.markdown("<div class='big'>분석할 정원이나 거실 사진을 올려주세요.</div>",
+        st.markdown("<div class='big fit1'>분석할 정원이나 거실 사진을 올려주세요.</div>",
                     unsafe_allow_html=True)
         st.caption("(A single, best photo is recommended)")
         ss.room = st.selectbox("공간 유형",
@@ -1620,16 +1664,16 @@ elif page == "space":
             recs = (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
             ss.sp_match = 95 + h % 5
             ss.sp_reason = ""
-        # ── 추천 식물 5종 준비 + 배치할 식물 확정 ──
+        # ── 추천 식물 3종 준비 + 배치할 식물 확정 ──
         # 중복 PID 제거(순서 유지) → plant_picker 버튼 키 충돌 방지
         _seen = set(); recs = [p for p in recs if not (p in _seen or _seen.add(p))]
         _fb_all = (OUTDOOR_RECS if outdoor else INDOOR_RECS)[ss.room]
-        for p in _fb_all:                        # 5종 미만이면 기본 추천으로 보충
-            if len(recs) >= 5:
+        for p in _fb_all:                        # 3종 미만이면 기본 추천으로 보충
+            if len(recs) >= 3:
                 break
             if p not in _seen:
                 recs.append(p); _seen.add(p)
-        recs = recs[:5] or _fb_all[:5]
+        recs = recs[:3] or _fb_all[:3]
         ss.sp_recs = recs
         if ss.get("sp_pid") not in recs:
             ss.sp_pid = recs[0]
@@ -1637,8 +1681,18 @@ elif page == "space":
 
         # ── 가상 배치 (기존 3단계를 여기로 병합) ──
         st.markdown("##### 🪴 가상 배치 체험")
-        mode = st.radio("합성 방식", ["🎚️ 수동 배치", "🤖 AI 실사 합성 (Flowerland)"],
-                        horizontal=True, index=0)   # 수동 배치가 기본
+        # 선택지 한 줄 고정 + 화면 폭에 따라 글자 자동 축소 (라벨은 숨김)
+        st.markdown("""<style>
+        [class*="st-key-mode_sel"] [role="radiogroup"] {
+            flex-direction:row !important; flex-wrap:nowrap !important;
+            gap:14px !important; }
+        [class*="st-key-mode_sel"] [role="radiogroup"] label { white-space:nowrap; }
+        [class*="st-key-mode_sel"] [role="radiogroup"] label p {
+            font-size:clamp(11px, 3.6vw, 15px) !important; white-space:nowrap; }
+        </style>""", unsafe_allow_html=True)
+        mode = st.radio("합성 방식", ["🎚️ 수동 배치", "🤖 AI 실사 합성"],
+                        horizontal=True, index=0, key="mode_sel",
+                        label_visibility="collapsed")   # 라벨 표시 제거
         if mode.startswith("🎚️"):
             st.caption("✌️ 두 손가락으로 크기·위치 조절 · 한 손가락은 화면 스크롤 "
                        "(PC는 드래그 이동, 휠로 크기)")
@@ -1674,9 +1728,12 @@ elif page == "space":
                         st.code(_err)
                     place_stage(pid, key="st2")     # 실패 시 수동 배치로 자동 대체
 
-        # ── 추천 식물 5종: 사진 바로 아래 · 탭하면 사진에 올라옵니다 ──
-        st.markdown("#### 🌿 추천 식물 5종 · 탭하면 사진에 올라옵니다")
+        # ── 추천 식물 3종: 사진 바로 아래 · 식물 사진을 탭하면 선택 ──
+        st.markdown("#### 🌿 추천 식물 3종 · 식물 사진을 탭하면 위에 올라옵니다")
         plant_picker(recs, "pick2")
+
+        # ── 선택한 식물의 특징·꽃말·좋은 점 (AI 요약, 식물별 캐시) ──
+        plant_brief_card(ss.sp_pid)
 
         # ── 분석 라인(창문방향…여백) + 종합 추천 지표 ──
         chips = " &nbsp;·&nbsp; ".join(
@@ -1714,8 +1771,10 @@ elif page == "space":
         except TypeError:
             _grp = st.container()
         with _grp:
-            st.markdown("<div style='font-weight:800; font-size:15px; color:#2E7D32; "
-                        "margin:0'>🌿 다른 식물로 바꿔보기 · 탭하면 아래 사진에 올라옵니다</div>",
+            st.markdown("<div style='font-weight:800; color:#2E7D32; margin:0; "
+                        "font-size:clamp(10.5px, 3.3vw, 15px); white-space:nowrap; "
+                        "overflow:hidden; text-overflow:ellipsis;'>"
+                        "🌿 다른 식물로 바꿔보기 · 식물 사진을 탭하면 아래에 올라옵니다</div>",
                         unsafe_allow_html=True)
             plant_picker(recs, "pick4")
             # 사진 위에 식물 배치 미리보기 (핀치=크기·위치)
@@ -1727,7 +1786,11 @@ elif page == "space":
                     f"{reason}<br>단지 평균가 / 건강 장수 수명 ⭐ 4.9</div>",
                     unsafe_allow_html=True)
 
-        st.markdown("#### 이 식물을 가장 잘 키우고 조경 자재를 보유한 농원")
+        st.markdown(f"<div style='font-weight:800; color:{GREEN}; margin:10px 0 4px; "
+                    f"font-size:clamp(12px, 4.1vw, 18px); white-space:nowrap; "
+                    f"overflow:hidden; text-overflow:ellipsis;'>"
+                    f"🏆 이 식물을 가장 잘 키우고 조경 자재를 보유한 농원</div>",
+                    unsafe_allow_html=True)
         b = best_nursery(pid, "fun02")
         if b: best_card(b, pid)
         if st.button("처음부터 다시", use_container_width=True):
