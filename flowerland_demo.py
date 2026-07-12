@@ -928,8 +928,8 @@ def place_stage(pid, key="stage", height=None):
         _aspect = (_w / _h) if _h else 1.4
     except Exception:
         _aspect = 1.4
-    if height is None:      # 초기 추정치일 뿐, 로드 직후 fitFrame()이 실제 높이로 보정한다
-        height = int(min(3000, max(120, 700 / _aspect + 8)))
+    if height is None:      # 모바일(~380px 폭) 기준 추정치. 로드 직후 fitFrame()이
+        height = int(min(3000, max(120, 380 / _aspect + 8)))   # 실제 높이로 보정(PC=확대, 모바일=미세조정)
     ill = plant_illust(pid)
     _pi = _white_to_transparent(ill) if ill else \
         draw_plant(400, "blue" if pid == "P416" else None, pot=ss.get("pot_style"))
@@ -947,8 +947,10 @@ def place_stage(pid, key="stage", height=None):
                   transform:translate(-50%,-50%); cursor:grab;
                   filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));">
       <div style="position:absolute; left:8px; bottom:8px; background:rgba(46,125,50,.85);
-           color:#fff; font-size:12px; padding:3px 9px; border-radius:8px;">
-        {PLANT_NAMES.get(pid,'')} — 두 손가락으로 크기·위치 · 한 손가락은 스크롤</div>
+           color:#fff; font-size:11px; padding:2px 8px; border-radius:8px;
+           white-space:nowrap; max-width:calc(100% - 16px); overflow:hidden;
+           text-overflow:ellipsis;">
+        {PLANT_NAMES.get(pid,'')} · 두 손가락=크기·위치</div>
     </div>
     <script>
     (function(){{
@@ -985,24 +987,29 @@ def place_stage(pid, key="stage", height=None):
       }},{{passive:false}});
       stage.addEventListener('touchend',e=>{{ if(e.touches.length<2){{ pinch=0; }} }});
       // ── iframe 높이를 사진 실제 높이에 맞춰 조정 ──
-      // 주의: 상위 부모(stVerticalBlock 등)까지 높이를 고정하면 그 블록에 담긴
-      //       이후 콘텐츠 전체가 잘려 PC에서 '화면 절반만' 보이는 버그가 생긴다.
-      //       → iframe 자신 + 직속 래퍼(이 iframe만 담는 element-container)까지만 조정.
+      // 원칙: 이 iframe '만' 담고 있는(자식 1개) 래퍼는 함께 줄이고/늘리고,
+      //       형제 콘텐츠가 있는 블록(stVerticalBlock 등)에 닿으면 멈춘다.
+      //       → 모바일: 아래 빈 공간 제거 / PC: 이후 콘텐츠 잘림 없음.
       function fitFrame(){{
         try{{
           const fh=Math.ceil(stage.getBoundingClientRect().height);
           if(fh>0 && window.frameElement){{
-            const ifr=window.frameElement;
-            ifr.style.height=fh+'px'; ifr.setAttribute('height', fh);
-            ifr.style.minHeight='0px'; ifr.style.maxHeight='none';
-            const wrap=ifr.parentElement;      // 직속 래퍼 1단계만
-            if(wrap && wrap.style){{
-              wrap.style.height=fh+'px'; wrap.style.minHeight='0px';
-              wrap.style.maxHeight='none';
+            let el=window.frameElement;
+            el.setAttribute('height', fh);
+            while(el && el.style){{
+              el.style.height=fh+'px'; el.style.minHeight='0px';
+              el.style.maxHeight='none';
+              const p=el.parentElement;
+              if(!p || !p.style || p.children.length!==1) break;  // 공유 컨테이너는 손대지 않음
+              el=p;
             }}
           }}
         }}catch(e){{}}
       }}
+      // 로드 직후 3초간 매 프레임 보정(웹뷰·재렌더로 높이가 되돌아가는 것 방지)
+      (function _pump(t0){{ fitFrame();
+        if(performance.now()-t0<3000) requestAnimationFrame(()=>_pump(t0));
+      }})(performance.now());
       const _bg=stage.querySelector('img');
       if(_bg && _bg.complete) fitFrame(); else if(_bg) _bg.addEventListener('load',fitFrame);
       window.addEventListener('resize',fitFrame);
