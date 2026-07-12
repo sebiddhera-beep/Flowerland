@@ -1674,16 +1674,17 @@ elif page == "space":
                         st.code(_err)
                     place_stage(pid, key="st2")     # 실패 시 수동 배치로 자동 대체
 
-        # ── 사진 아래: 분석 라인(창문방향…여백) + 종합 추천 지표 (첨부 이미지 순서) ──
+        # ── 추천 식물 5종: 사진 바로 아래 · 탭하면 사진에 올라옵니다 ──
+        st.markdown("#### 🌿 추천 식물 5종 · 탭하면 사진에 올라옵니다")
+        plant_picker(recs, "pick2")
+
+        # ── 분석 라인(창문방향…여백) + 종합 추천 지표 ──
         chips = " &nbsp;·&nbsp; ".join(
             f"{e} <b>{t}</b> {s.split('<br>')[0]}" for (e, t, s) in cards)
         st.markdown(f"<div class='acard' style='text-align:left; font-size:14px; "
                     f"line-height:1.9'>{chips}</div>", unsafe_allow_html=True)
         st.markdown(f"### 종합 추천 지표 · 생육 난이도 최적: {'⭐' * stars}")
 
-        # ── 추천 식물 5종: 사진 아래에서 탭하면 사진에 올라옵니다 ──
-        st.markdown("#### 🌿 추천 식물 5종 · 탭하면 사진에 올라옵니다")
-        plant_picker(recs, "pick2")
         if mode.startswith("🎚️"):
             _pot = ["토분", "플라스틱(화이트)", "야외용(다크)"]
             ss.pot_style = st.selectbox("🏺 화분 스타일", _pot,
@@ -1703,10 +1704,22 @@ elif page == "space":
         st.markdown(f"<div class='big'>{USER_NAME}님! 이 식물이 당신의 {ss.room}과 "
                     f"{match}% 어울립니다!</div>", unsafe_allow_html=True)
 
-        # 사진 위에 식물 배치 미리보기 (핀치=크기·위치, 요청 8)
-        place_stage(pid, key="st4")
-        st.markdown("##### 🌿 다른 식물로 바꿔보기 · 탭하면 사진에 올라옵니다")
-        plant_picker(recs, "pick4")
+        # ── 식물 선택 탭(위) → 사진(아래) 밀착 배치: 탭하면 아래 사진에 즉시 반영 ──
+        st.markdown("""<style>
+        [class*="st-key-st3_grp"] { gap:.3rem !important; }
+        [class*="st-key-st3_grp"] [data-testid="stVerticalBlock"] { gap:.3rem !important; }
+        </style>""", unsafe_allow_html=True)
+        try:
+            _grp = st.container(key="st3_grp")
+        except TypeError:
+            _grp = st.container()
+        with _grp:
+            st.markdown("<div style='font-weight:800; font-size:15px; color:#2E7D32; "
+                        "margin:0'>🌿 다른 식물로 바꿔보기 · 탭하면 아래 사진에 올라옵니다</div>",
+                        unsafe_allow_html=True)
+            plant_picker(recs, "pick4")
+            # 사진 위에 식물 배치 미리보기 (핀치=크기·위치)
+            place_stage(pid, key="st4")
 
         reason = ss.get("sp_reason") or PLANT_DESC.get(
             pid, "이 공간의 채광·규모에 최적화된 추천 식물")
